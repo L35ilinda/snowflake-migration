@@ -4,20 +4,28 @@ Modular Terraform for the Snowflake migration project. See [ADR-0001](../docs/ad
 
 ## Layout
 
-```
+```text
 terraform/
   bootstrap/                      # one-time: creates the tfstate container (LOCAL state)
   environments/
-    dev/                          # dev environment root — apply from here
+    dev/                          # dev environment root - apply from here
   modules/
+    snowflake_company_ingest/
+    snowflake_database_layers/
     snowflake_storage_integration/
     snowflake_rbac/               # scaffolded, empty
     snowflake_warehouses/         # scaffolded, empty
 ```
 
-You never run `terraform apply` from `terraform/` root. You run it from an environment root (`environments/dev/`) or from `bootstrap/`.
+You never run `terraform apply` from `terraform/` root. Run it from an environment root (`environments/dev/`) or from `bootstrap/`.
 
-## First-run order (Foundations phase)
+## Current status
+
+- Remote-state bootstrap is already applied.
+- The shared storage integration is already applied and Azure-side consent/RBAC is complete.
+- The current dev plan will create the database layer plus three per-company ingest surfaces.
+
+## Foundations flow
 
 ### 1. Bootstrap the remote state backend (one time only)
 
@@ -29,40 +37,57 @@ terraform plan
 terraform apply
 ```
 
-This creates a `tfstate` container inside the existing `fspsftpsource` storage account. State for the bootstrap itself stays local (chicken-and-egg — it can't store its own state in a container it's about to create). Commit-safe: `*.tfstate` is gitignored.
+This creates a `tfstate` container inside the existing `fspsftpsource` storage account. State for the bootstrap itself stays local because it cannot store its own state in a container it is about to create.
 
-### 2. Initialize and plan the dev environment
+### 2. Initialize and apply the storage integration
 
 ```bash
-cd ../environments/dev
-terraform init          # downloads providers, connects to azurerm backend
+cd terraform/environments/dev
+terraform init
 terraform plan
-```
-
-First `plan` for the storage integration will succeed, but the resulting Azure enterprise-app needs **manual admin consent** before Snowflake can actually read the containers. After `apply`:
-
-```bash
 terraform apply
 terraform output storage_integration_azure_consent_url
 ```
 
-Open the URL, grant consent in the Azure portal. Then in a Snowflake worksheet, `DESC STORAGE INTEGRATION <name>;` to copy the `AZURE_MULTI_TENANT_APP_NAME` — grant it **Storage Blob Data Reader** on the storage account (or per-container, stricter).
+After the first storage-integration apply:
 
-### 3. Verify
+1. Open the consent URL and grant Azure admin consent.
+2. Grant **Storage Blob Data Reader** to the principal named in `storage_integration_azure_multi_tenant_app_name`.
+3. Verify with `DESC STORAGE INTEGRATION <name>;`.
 
-From Snowflake, once stages are created (next module):
+### 3. Current next apply: database layers plus company ingest
+
+```bash
+cd terraform/environments/dev
+terraform init
+terraform plan
+terraform apply
+```
+
+Current clean plan: `13 to add, 0 to change, 0 to destroy`.
+
+That apply will create:
+
+- `ANALYTICS_DEV`
+- `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, `RAW_HORIZON_ASSURANCE`
+- `STAGING`, `CORE`, `MARTS`
+- `FF_CSV_COMPANY_01`, `FF_CSV_COMPANY_02`, `FF_CSV_COMPANY_03`
+- `STG_COMPANY_01_OUTBOUND`, `STG_COMPANY_02_OUTBOUND`, `STG_COMPANY_03_OUTBOUND`
+
+### 4. Verify
 
 ```sql
-LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND;
+LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND/Outbound;
 ```
 
 ## Provider versions
 
 - `hashicorp/azurerm ~> 4.0`
-- `Snowflake-Labs/snowflake ~> 1.0` (⚠️ v1.x had breaking changes vs 0.9x — verify resource/field names against current docs before any `apply`; this scaffold uses common names but the provider evolves quickly)
+- `snowflakedb/snowflake ~> 1.0`
 
 ## Secrets
 
 - No secrets live in `.tf` or `.tfvars` files. Azure IDs and Snowflake account IDs are non-secret config.
-- Snowflake auth uses SSO via the provider's external-browser flow — no password in state.
-- `.env` at the repo root holds the same values as `terraform.tfvars` for use by other tooling (dbt, scripts). Keep them in sync.
+- Snowflake auth uses key-pair auth (`SNOWFLAKE_JWT`) via `private_key = file(var.snowflake_private_key_path)`.
+- The private key stays outside the repo. `terraform/.gitignore` defensively ignores `*.p8`, `*.pem`, and `*.key`.
+- `.env` at the repo root holds the same values as `terraform.tfvars` for other tooling (dbt, scripts). Keep them in sync.

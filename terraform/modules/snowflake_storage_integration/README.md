@@ -1,6 +1,6 @@
 # Module: `snowflake_storage_integration`
 
-Creates a single Snowflake storage integration pointing at one or more Azure blob containers in the same storage account. Intentionally shared across companies — see [ADR-0003](../../../docs/adr/0003-shared-storage-integration.md).
+Creates a single Snowflake storage integration pointing at one or more Azure blob containers in the same storage account. It is intentionally shared across companies - see [ADR-0003](../../../docs/adr/0003-shared-storage-integration.md).
 
 ## Inputs
 
@@ -22,7 +22,7 @@ Creates a single Snowflake storage integration pointing at one or more Azure blo
 
 ## Post-apply steps
 
-1. `terraform output storage_integration_azure_consent_url` → open URL, grant consent.
-2. In Azure portal → the storage account → IAM → add role assignment **Storage Blob Data Reader** to the principal named in `storage_integration_azure_multi_tenant_app_name`.
-3. In Snowflake: `DESC STORAGE INTEGRATION <name>;` — verify `STORAGE_ALLOWED_LOCATIONS` lists all three containers.
-4. Integration is now usable by external stages (next module: `snowflake_external_stage`).
+1. Run `terraform output storage_integration_azure_consent_url`, open the URL, and grant consent.
+2. In Azure portal, go to the storage account IAM page and add **Storage Blob Data Reader** to the principal named in `storage_integration_azure_multi_tenant_app_name`.
+3. In Snowflake, run `DESC STORAGE INTEGRATION <name>;` and verify `STORAGE_ALLOWED_LOCATIONS` lists all three containers.
+4. The integration is now usable by the per-company ingest module in this repo: `snowflake_company_ingest`.

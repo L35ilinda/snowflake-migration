@@ -2,39 +2,40 @@
 
 Migrating a legacy SQL Server + SSIS + SSAS + SSRS + Power BI BI stack to a Snowflake-native architecture on Azure. Built to enterprise standards as a Snowflake Solution Architect portfolio project.
 
-See [CLAUDE.md](CLAUDE.md) for full architecture, conventions, and phased roadmap.
+See [CLAUDE.md](CLAUDE.md) for the full architecture, conventions, and phased roadmap.
 
 ## Repo layout
 
-```
-terraform/   # IaC for all Snowflake + Azure objects
-dbt/         # dbt Core project (staging → core → marts)
+```text
+terraform/   # IaC for Snowflake and Azure objects
+dbt/         # dbt Core project (staging -> core -> marts)
 snowpipe/    # Snowpipe definitions and quarantine patterns
-airflow/     # Demo DAG (skill-demo, not core orchestration)
+airflow/     # Demo DAG (skill demo, not core orchestration)
 streamlit/   # Streamlit-in-Snowflake apps (Cortex Analyst)
-notebooks/   # Ad-hoc analysis / design scratchpads
+notebooks/   # Ad-hoc analysis and design scratchpads
 data/        # Source-data inventory and sample metadata (no raw data)
 ```
 
 ## Prerequisites
 
-- **Terraform** ≥ 1.14 — `winget install HashiCorp.Terraform`
+- **Terraform** >= 1.14 - `winget install HashiCorp.Terraform`
 - **Python** 3.11+ with `dbt-core` and `dbt-snowflake`
-- **Azure CLI** — authenticated to subscription `60abe083-7f78-4a57-9f4f-ca0214215c77`
-- **Snowflake account** — Enterprise edition, `AZURE_EASTUS`, SSO-enabled user
+- **Azure CLI** - authenticated to subscription `60abe083-7f78-4a57-9f4f-ca0214215c77`
+- **Snowflake account** - Enterprise edition in `AZURE_EASTUS`, with an RSA public key registered on the user for programmatic auth
 - **PowerShell 7** or Bash (Git Bash / WSL)
 
 ## Environment setup
 
-Copy the block below into a new file named `.env` at the repo root (`snowflake-migration/.env`). It is gitignored. Fill in any values that differ from the defaults.
+Copy the block below into a new file named `.env` at the repo root (`snowflake-migration/.env`). It is gitignored.
 
 ```bash
 # ---- Snowflake ----
-SNOWFLAKE_ACCOUNT=VNCENFN-XF07416       # org-account identifier
+SNOWFLAKE_ACCOUNT=VNCENFN-XF07416
 SNOWFLAKE_USER=LSILINDA
-SNOWFLAKE_AUTHENTICATOR=externalbrowser # SSO — no password stored
-SNOWFLAKE_ROLE=ACCOUNTADMIN             # bootstrap only; switch to FR_ENGINEER post-RBAC
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH          # until LOAD_WH/TRANSFORM_WH exist
+SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT
+SNOWFLAKE_PRIVATE_KEY_PATH=C:/Users/Lonwabo_Eric/.snowflake/keys/lsilinda_rsa_key.p8
+SNOWFLAKE_ROLE=ACCOUNTADMIN
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 SNOWFLAKE_DATABASE=ANALYTICS_DEV
 SNOWFLAKE_REGION=AZURE_EASTUS
 
@@ -51,11 +52,21 @@ AZURE_CONTAINER_COMPANY_03=fsp-company-03
 
 ### Secrets policy
 
-- `.env` is gitignored — never commit it.
-- No Snowflake password is stored; auth uses SSO (`externalbrowser`).
-- Azure subscription/tenant IDs are not secrets but are pinned here for reproducibility.
-- Any service principal credentials added later go in `.env` only, referenced via env vars in Terraform.
+- `.env` is gitignored. Never commit it.
+- No Snowflake password is stored. Programmatic auth uses key-pair auth (`SNOWFLAKE_JWT`).
+- The private key lives outside the repo at `C:/Users/Lonwabo_Eric/.snowflake/keys/`.
+- Azure subscription and tenant IDs are not secrets, but they are pinned here for reproducibility.
+- Any service principal credentials added later go in `.env` only and are referenced via environment variables in Terraform.
+
+## Current status
+
+**Foundations** is in progress.
+
+- Applied already: Terraform bootstrap for remote state and the shared Snowflake storage integration `SI_AZURE_FSPSFTPSOURCE_DEV`.
+- Built in code but not yet applied: `ANALYTICS_DEV`, named RAW schemas, shared `STAGING`/`CORE`/`MARTS`, and the three per-company external stages plus CSV file formats.
+- Current Terraform plan in `terraform/environments/dev` is clean: `13 to add, 0 to change, 0 to destroy`.
+- Immediate next step: `terraform apply` in `terraform/environments/dev`, then verify stage access with `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND/Outbound;`.
 
 ## Current phase
 
-**Foundations** — see [CLAUDE.md §4](CLAUDE.md) for the live checklist of what's done and what's next.
+**Foundations** - see [CLAUDE.md](CLAUDE.md) for the live checklist of what is done and what is next.
