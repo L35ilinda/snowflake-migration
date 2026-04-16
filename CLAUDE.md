@@ -113,6 +113,7 @@ resource monitors, Airflow
 - **Terraform:** installed locally (`1.14.8`)
 - **Azure CLI:** installed locally and authenticated to the project subscription
 - **IDE:** VS Code with Claude Code extension
+- **Python runtime:** Anaconda (`C:\ProgramData\anaconda3`). Use this for pip, dbt, snowflake-connector, and all Python tooling.
 - **OS / shell:** Windows 11 with PowerShell + Bash
 
 ## 4. Current state - what's been done
