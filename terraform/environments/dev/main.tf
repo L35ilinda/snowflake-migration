@@ -113,3 +113,75 @@ module "rbac" {
     LSILINDA = ["FR_ENGINEER"]
   }
 }
+
+# ---- Warehouses + resource monitors ----
+# Workload-separated warehouses per CLAUDE.md §5. All start suspended.
+module "warehouses" {
+  source = "../../modules/snowflake_warehouses"
+
+  environment = var.environment
+
+  warehouses = {
+    LOAD_WH = {
+      size           = "XSMALL"
+      auto_suspend   = 60
+      comment        = "Snowpipe and COPY INTO workloads."
+      grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
+    }
+    TRANSFORM_WH = {
+      size           = "XSMALL"
+      auto_suspend   = 60
+      comment        = "dbt transformations."
+      grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
+    }
+    BI_WH = {
+      size           = "XSMALL"
+      auto_suspend   = 60
+      comment        = "BI and ad-hoc queries."
+      grant_usage_to = [
+        module.rbac.functional_role_names["FR_ENGINEER"],
+        module.rbac.functional_role_names["FR_ANALYST"],
+      ]
+    }
+  }
+
+  resource_monitors = {
+    # Account-level backstop — caps total account spend regardless of warehouse.
+    RM_DEV_ACCOUNT = {
+      credit_quota              = 10
+      frequency                 = "MONTHLY"
+      start_timestamp           = "2026-05-01 00:00"
+      notify_triggers           = [75, 90, 100]
+      suspend_trigger           = 100
+      suspend_immediate_trigger = 110
+    }
+    # Per-warehouse monitors — finer cost control per workload.
+    RM_LOAD_WH = {
+      credit_quota              = 5
+      frequency                 = "MONTHLY"
+      start_timestamp           = "2026-05-01 00:00"
+      notify_triggers           = [75, 90, 100]
+      suspend_trigger           = 100
+      suspend_immediate_trigger = 110
+      warehouses                = ["LOAD_WH"]
+    }
+    RM_TRANSFORM_WH = {
+      credit_quota              = 3
+      frequency                 = "MONTHLY"
+      start_timestamp           = "2026-05-01 00:00"
+      notify_triggers           = [75, 90, 100]
+      suspend_trigger           = 100
+      suspend_immediate_trigger = 110
+      warehouses                = ["TRANSFORM_WH"]
+    }
+    RM_BI_WH = {
+      credit_quota              = 2
+      frequency                 = "MONTHLY"
+      start_timestamp           = "2026-05-01 00:00"
+      notify_triggers           = [75, 90, 100]
+      suspend_trigger           = 100
+      suspend_immediate_trigger = 110
+      warehouses                = ["BI_WH"]
+    }
+  }
+}
