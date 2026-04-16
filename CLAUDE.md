@@ -85,11 +85,14 @@ resource monitors, Airflow
 
 ### Azure Storage
 - **Storage account:** `fspsftpsource`
-- **Containers (multi-tenant):**
-  - `fsp-company-01` - currently holds all 70 files in `Outbound/`
-  - `fsp-company-02` - to be populated
-  - `fsp-company-03` - to be populated
-- **Path convention (target):** `fsp-company-NN/Outbound/<filename>.csv`
+- **Containers (Terraform-managed, descriptive naming):**
+  - `fsp-main-book` — 6 CSVs (main_book_* files)
+  - `fsp-indigo-insurance` — 6 CSVs (indigo_* files)
+  - `fsp-horizon-assurance` — 6 CSVs (horizon_* files)
+  - `fsp-data-onboarding-queue` — 60 files awaiting onboarding (other company groups + shared/reference tables)
+  - `tfstate` — Terraform remote state (bootstrap-managed)
+- **Path convention:** `fsp-<company-name>/<filename>.csv` (flat, no subdirectories)
+- **Legacy containers (`fsp-company-01/02/03`):** deleted — replaced by descriptive names above
 - **Auth to Snowflake:** shared storage integration `SI_AZURE_FSPSFTPSOURCE_DEV` is live and Azure-consented
 
 ### Snowflake
@@ -100,7 +103,7 @@ resource monitors, Airflow
 - **Default user:** `LSILINDA`
 - **Auth method:** key-pair for programmatic clients (`SNOWFLAKE_JWT`); interactive Snowsight still uses browser login and MFA
 - **Current role:** `ACCOUNTADMIN` (bootstrap only - switch to a dedicated dev role after RBAC exists)
-- **Target database:** `ANALYTICS_DEV` (defined in Terraform, apply pending)
+- **Target database:** `ANALYTICS_DEV` (live, Terraform-managed)
 - **Legacy sandbox database:** `FSP_DATA_INTEGRATION_DB` (keep isolated from project objects)
 - **Default warehouse:** `COMPUTE_WH` (default only, to be replaced by workload-separated warehouses)
 
@@ -115,30 +118,28 @@ resource monitors, Airflow
 ## 4. Current state - what's been done
 
 ### Done
-- [x] Azure subscription, resource group, storage account, three containers created
-- [x] 70 synthetic CSV files generated and uploaded to `fsp-company-01/Outbound/`
+- [x] Azure subscription, resource group, storage account created
+- [x] 70+ synthetic CSV files generated
 - [x] Snowflake Enterprise account provisioned (Azure East US)
-- [x] One mock learning table loaded (`MOCK_DATA` in `FSP_DATA_INTEGRATION_DB.PUBLIC`) - ignore, not part of the project
 - [x] Project directory scaffolded (Terraform, dbt, Snowpipe, Streamlit, Airflow, GitHub Actions structure)
-- [x] Terraform v1.14.8 installed locally
-- [x] Azure CLI installed and authenticated
+- [x] Terraform v1.14.8 installed locally; Azure CLI installed and authenticated
 - [x] `.env` populated with Azure config plus Snowflake key-pair settings
-- [x] README, ADR, and session-log structure created
-- [x] ADR-0001 through ADR-0006 written in `docs/adr/`
-- [x] Terraform bootstrap applied; remote state backend is live in `fspsftpsource/tfstate/environments/dev/terraform.tfstate`
-- [x] Azure Blob data-plane RBAC fixed so `terraform init` works against the backend
-- [x] Snowflake provider migrated from `Snowflake-Labs/snowflake` to `snowflakedb/snowflake`
-- [x] Programmatic auth pivoted from `ExternalBrowser` to key-pair auth (`SNOWFLAKE_JWT`)
-- [x] RSA key pair generated outside the repo and the public key registered on `LSILINDA`
-- [x] Shared storage integration `SI_AZURE_FSPSFTPSOURCE_DEV` applied, admin-consented, granted `Storage Blob Data Reader`, and verified
-- [x] `snowflake_database_layers` module built for `ANALYTICS_DEV` and named RAW schemas
-- [x] `snowflake_company_ingest` module built and composed for companies `01`, `02`, and `03`
-- [x] Current dev Terraform plan reviewed successfully: `13 to add, 0 to change, 0 to destroy`
+- [x] README, ADR, and session-log structure created; ADR-0001 through ADR-0006 written
+- [x] Terraform bootstrap applied; remote state backend live in `fspsftpsource/tfstate/`
+- [x] Snowflake provider migrated to `snowflakedb/snowflake`; key-pair auth (`SNOWFLAKE_JWT`) configured
+- [x] RSA key pair generated outside the repo; public key registered on `LSILINDA`
+- [x] Shared storage integration `SI_AZURE_FSPSFTPSOURCE_DEV` applied, admin-consented, verified
+- [x] `azure_blob_containers` module built — manages containers in existing storage account via `for_each`
+- [x] Adopted descriptive container naming: `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`, `fsp-data-onboarding-queue`
+- [x] Deleted legacy generic containers (`fsp-company-01/02/03`)
+- [x] `snowflake_database_layers` module built and applied — `ANALYTICS_DEV` with 6 schemas live
+- [x] `snowflake_company_ingest` module built and applied — uses descriptive `company_name` for Snowflake object naming
+- [x] All stages and file formats live with descriptive names (`STG_MAIN_BOOK`, `FF_CSV_MAIN_BOOK`, etc.)
+- [x] Files distributed: 6 CSVs each in `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`; 60 files in onboarding queue
+- [x] Verified end-to-end: `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_MAIN_BOOK;` returns 6 CSVs
+- [x] `scripts/list_stage.py` added for programmatic stage verification
 
 ### Pending
-- [ ] Apply the current dev Terraform plan to create `ANALYTICS_DEV`, named RAW schemas, shared schemas, and the three stage/file-format pairs
-- [ ] Verify `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND/Outbound;`
-- [ ] Split the 70 files across the three containers (for example `25/25/20`)
 - [ ] Build Terraform module: RBAC scaffolding (functional + access roles, never grant directly to users)
 - [ ] Build Terraform module: workload-separated warehouses (`LOAD_WH`, `TRANSFORM_WH`, `BI_WH`) with auto-suspend <= 60s
 - [ ] Build Terraform module: resource monitors (account-level and warehouse-level)
@@ -146,35 +147,35 @@ resource monitors, Airflow
 - [ ] Define quarantine table pattern for rejected rows
 - [ ] Initialize dbt project and get `dbt debug` green with key-pair auth
 - [ ] First staging model built and tested against a RAW table
+- [ ] Onboard remaining 60 files from `fsp-data-onboarding-queue` (8 company groups + shared/reference tables)
 - [ ] CI/CD pipelines validated end to end
 
 ### Snowflake current state
-- **Databases:** `FSP_DATA_INTEGRATION_DB` (sandbox), `SNOWFLAKE`, `SNOWFLAKE_LEARNING_DB`, `SNOWFLAKE_SAMPLE_DATA`, `USER$LSILINDA`; `ANALYTICS_DEV` is defined in Terraform but not applied yet
-- **Schemas in project DB:** not created yet; current plan will add `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, `RAW_HORIZON_ASSURANCE`, `STAGING`, `CORE`, and `MARTS`
-- **Tables:** `FSP_DATA_INTEGRATION_DB.PUBLIC.MOCK_DATA` (1000 rows, ignore - learning artifact)
-- **Warehouses:** `COMPUTE_WH` (default, X-Small, auto-suspend 300s), `SYSTEM$STREAMLIT_NOTEBOOK_WH` (system, leave alone)
-- **Roles:** defaults only (`ACCOUNTADMIN`, `SYSADMIN`, `SECURITYADMIN`, `USERADMIN`, `ORGADMIN`, `PUBLIC`) - no custom roles yet
-- **Storage integrations:** `SI_AZURE_FSPSFTPSOURCE_DEV`
-- **Stages:** none yet; current plan will create `STG_COMPANY_01_OUTBOUND`, `STG_COMPANY_02_OUTBOUND`, `STG_COMPANY_03_OUTBOUND`
+- **Databases:** `ANALYTICS_DEV` (project, Terraform-managed), `FSP_DATA_INTEGRATION_DB` (sandbox, ignore), system databases
+- **Schemas in `ANALYTICS_DEV`:** `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, `RAW_HORIZON_ASSURANCE`, `STAGING`, `CORE`, `MARTS`
+- **Tables:** none in project DB yet; `FSP_DATA_INTEGRATION_DB.PUBLIC.MOCK_DATA` (ignore)
+- **Warehouses:** `COMPUTE_WH` (default, X-Small, auto-suspend 300s)
+- **Roles:** defaults only — no custom roles yet
+- **Storage integrations:** `SI_AZURE_FSPSFTPSOURCE_DEV` (covers `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`)
+- **Stages:** `STG_MAIN_BOOK`, `STG_INDIGO_INSURANCE`, `STG_HORIZON_ASSURANCE` (in respective RAW schemas)
 - **Pipes:** none
-- **File formats:** none yet; current plan will create `FF_CSV_COMPANY_01`, `FF_CSV_COMPANY_02`, `FF_CSV_COMPANY_03`
-- **Terraform-managed Snowflake state:** currently contains only `module.storage_integration.snowflake_storage_integration.this`
+- **File formats:** `FF_CSV_MAIN_BOOK`, `FF_CSV_INDIGO_INSURANCE`, `FF_CSV_HORIZON_ASSURANCE`
+- **Terraform-managed state:** storage integration, database, 6 schemas, 3 stages, 3 file formats, 4 Azure containers
 
-### Source data shape (the 70 files)
-- **Count:** 70 CSV files
-- **Total rows:** ~10-20 million across all files
-- **Current location:** `fspsftpsource/fsp-company-01/Outbound/` (all 70, still to be split)
+### Source data shape
+- **Total files:** ~80 CSVs across all containers + onboarding queue
+- **Onboarded (18 files):** `main_book_*` (6), `indigo_*` (6), `horizon_*` (6) — in respective company containers at root level
+- **Awaiting onboarding (60 files):** in `fsp-data-onboarding-queue/Outbound/`
+  - 8 company groups: baobab (6), fynbos (6), karoo (6), khoisan (6), protea (6), springbok (6), summit (6), ubuntu (6) = 48 files
+  - Shared/reference tables (10): `_client_pool`, `accounts`, `advisor_company_codes`, `advisor_pool`, `branches`, `cards`, `customers`, `loans`, `product_pool`, `transactions`
+  - Other (4): `data_dictionary`, `risk_benefits`, `risk_benefits_transactions`, `policy_valuations`, `policy_valuations_transactions`
+  - Non-data (2): `MOCK_DATA.csv`, `README.md`
 - **Naming pattern (intentionally non-standard, mimicking heterogeneous suppliers):**
   - `<companyname>_inv_<datasettype>.csv`
   - `<companyname>_ins_<datasettype>.csv`
   - `<companyname>_<datasettype>.csv`
-- **Dataset types:** `commission`, `transaction`, `insurance`, `valuations`, `market_values`, etc. - non-exhaustive, no enforced standard
-- **Format:** CSV, comma-delimited, all have headers
-- **Quirks (intentional):**
-  - PII columns present (will need masking policies)
-  - Empty cells / nulls
-  - Plan to introduce mixed encodings and mixed data formats later for added realism
-  - No standardized naming across companies
+- **Format:** CSV, comma-delimited, all have headers, files at container root (no subdirectories)
+- **Quirks (intentional):** PII columns, empty cells/nulls, non-standardized naming across companies
 
 ## 5. Conventions and standards
 
@@ -189,13 +190,14 @@ resource monitors, Airflow
 - **Warehouses:** `<PURPOSE>_WH` - `LOAD_WH`, `TRANSFORM_WH`, `BI_WH`, `ADHOC_WH`
 - **Roles:** functional `FR_<n>` (for example `FR_ANALYST`, `FR_ENGINEER`), access `AR_<DB>_<SCHEMA>_<RW|RO>`
 - **Terraform resources:** `snake_case` matching Snowflake object names
-- **Stages:** `stg_company_NN_outbound`
-- **File formats:** `ff_csv_company_NN` (allowing per-company variation)
-- **Pipes:** `pipe_company_NN_<dataset_type>`
+- **Azure containers:** `fsp-<company-name>` (descriptive, e.g. `fsp-main-book`, not `fsp-company-01`)
+- **Stages:** `STG_<COMPANY_NAME>` (e.g. `STG_MAIN_BOOK`)
+- **File formats:** `FF_CSV_<COMPANY_NAME>` (e.g. `FF_CSV_MAIN_BOOK`)
+- **Pipes:** `PIPE_<COMPANY_NAME>_<DATASET_TYPE>`
 
 ### Architectural rules
 - **Schemas as layers:** `RAW_<COMPANY_NAME>` (1:1 source per tenant, append-only) -> `STAGING` (typed, cleaned, renamed, conformed) -> `CORE` (conformed dims and facts) -> `MARTS` (domain-specific, BI-ready)
-- **Tenant mapping (initial three):** Azure containers stay `fsp-company-01/02/03`, mapped in Terraform to `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, and `RAW_HORIZON_ASSURANCE`
+- **Tenant mapping (initial three):** Azure containers `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance` mapped 1:1 to `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, `RAW_HORIZON_ASSURANCE`
 - **Multi-tenant pattern:** isolate raw per company; conform in STAGING; merge into shared CORE
 - **Modeling:** Star Schema is the default in MARTS. One CORE domain should be modeled as Data Vault 2.0 (TBD which)
 - **dbt materializations:** staging = view, intermediate = ephemeral, core = table, marts = table or dynamic table where freshness matters
@@ -216,23 +218,20 @@ resource monitors, Airflow
 **Foundations phase.** Get one source loaded end to end via the proper pipeline:
 
 ```text
-Azure Storage (fsp-company-01) -> Storage Integration -> External Stage -> Snowpipe -> RAW_MAIN_BOOK -> dbt staging model
+Azure Storage (fsp-main-book) -> SI_AZURE_FSPSFTPSOURCE_DEV -> STG_MAIN_BOOK -> Snowpipe -> RAW_MAIN_BOOK -> dbt staging model
 ```
 
 Concrete steps for the next session:
-1. Apply the current `terraform plan` in `terraform/environments/dev` after explicit approval.
-2. Verify stage access with `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND/Outbound;`.
-3. Build Terraform module: minimal RBAC (`FR_ENGINEER` functional role + access roles for `ANALYTICS_DEV`).
-4. Build Terraform module: `LOAD_WH` (X-Small, auto-suspend 60s) and the first resource monitor.
-5. Initialize the dbt project, connect via env vars using key-pair auth, and get `dbt debug` green.
-6. Configure Snowpipe for one company-01 file pattern plus quarantine handling.
-7. Drop a test file in `fsp-company-01/Outbound/`, verify it lands in `RAW_MAIN_BOOK`.
-8. Build the first staging model in dbt and verify it runs against the RAW table.
-9. Decide and execute the file split across companies `01/02/03` before expanding ingest beyond the first company.
-10. Tag this state as `v0.1.0-foundations`.
-11. Commit each step with a clear message.
+1. Build Terraform module: minimal RBAC (`FR_ENGINEER` functional role + access roles for `ANALYTICS_DEV`).
+2. Build Terraform module: `LOAD_WH` (X-Small, auto-suspend 60s) and the first resource monitor.
+3. Initialize the dbt project, connect via env vars using key-pair auth, and get `dbt debug` green.
+4. Configure Snowpipe for Main Book file patterns plus quarantine handling.
+5. Drop a test file in `fsp-main-book/`, verify it lands in `RAW_MAIN_BOOK`.
+6. Build the first staging model in dbt and verify it runs against the RAW table.
+7. Tag this state as `v0.1.0-foundations`.
+8. Commit each step with a clear message.
 
-Once Foundations is green, the next milestone is **Replicate sources** - Snowpipe for the remaining files (after splitting across companies) plus a mock operational DB for Fivetran/Airbyte demonstration.
+Once Foundations is green, the next milestone is **Replicate sources** — Snowpipe for the remaining company files (onboard from queue) plus a mock operational DB for Fivetran/Airbyte demonstration.
 
 ## 7. How to interact with me (the user)
 
@@ -255,7 +254,7 @@ Once Foundations is green, the next milestone is **Replicate sources** - Snowpip
 - **Airflow hosting** - local Docker for the demo DAG, or Azure Container Apps? Local is fine for portfolio purposes.
 - **dbt Semantic Layer vs Snowflake Semantic Views vs Power BI semantic model** - defer until MARTS is built.
 - **Cross-region (Azure SA-North storage -> Snowflake Azure East US)** - keep as-is for portfolio (good teaching moment) or move to West Europe / co-locate? Leaning keep + document.
-- **File-splitting strategy across the three companies** - random, by dataset type, or by deliberate "company specialty"? Deliberate split makes for a better story (for example Main Book = financial, Indigo Insurance = insurance, Horizon Assurance = valuations).
+- **Onboarding queue strategy** — 60 files remain in `fsp-data-onboarding-queue`. 8 company groups (baobab, fynbos, karoo, khoisan, protea, springbok, summit, ubuntu) need to be assigned to the three tenant companies or treated as additional tenants. Shared/reference tables (accounts, customers, etc.) need a home — likely a shared container or loaded into all three RAW schemas.
 - **Encoding/format quirks to inject** - UTF-8 vs UTF-16 vs Latin-1? Mixed delimiters in some files? Plan once Foundations works.
 
 ## 9. Reference: phased roadmap
