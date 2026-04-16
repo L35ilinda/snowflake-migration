@@ -76,3 +76,40 @@ module "azure_containers" {
     "fsp-horizon-assurance"     = { access_type = "private" }
   }
 }
+
+# ---- RBAC ----
+# Access roles per schema (RW + RO), functional roles aggregate them,
+# users get functional roles only. See CLAUDE.md §5.
+module "rbac" {
+  source = "../../modules/snowflake_rbac"
+
+  database_name = module.database_layers.database_name
+  environment   = var.environment
+
+  schemas = merge(
+    { for cid, name in module.database_layers.raw_schema_names : lower(name) => name },
+    {
+      staging = module.database_layers.staging_schema_name
+      core    = module.database_layers.core_schema_name
+      marts   = module.database_layers.marts_schema_name
+    }
+  )
+
+  functional_roles = {
+    FR_ENGINEER = {
+      comment = "Full read-write access for data engineers."
+      access_role_grants = concat(
+        [for cid, name in module.database_layers.raw_schema_names : "${lower(name)}_rw"],
+        ["staging_rw", "core_rw", "marts_rw"]
+      )
+    }
+    FR_ANALYST = {
+      comment            = "Read-only access for analysts."
+      access_role_grants = ["staging_ro", "core_ro", "marts_ro"]
+    }
+  }
+
+  user_grants = {
+    LSILINDA = ["FR_ENGINEER"]
+  }
+}
