@@ -52,3 +52,18 @@ module "company_ingest" {
   container_name           = each.value.container_name
   environment              = var.environment
 }
+
+# ---- Azure blob containers ----
+# Manages containers in the existing storage account. Only add containers
+# here that are Terraform-managed; the three company containers were created
+# manually and can be imported later if desired.
+module "azure_containers" {
+  source = "../../modules/azure_blob_containers"
+
+  resource_group_name  = var.azure_resource_group_name
+  storage_account_name = var.azure_storage_account_name
+
+  containers = {
+    "fsp-data-onboarding-queue" = { access_type = "private" }
+  }
+}

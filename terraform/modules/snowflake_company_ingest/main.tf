@@ -42,5 +42,9 @@ resource "snowflake_stage" "outbound" {
   storage_integration = var.storage_integration_name
   file_format         = "FORMAT_NAME = ${var.database_name}.${var.raw_schema_name}.${snowflake_file_format.csv.name}"
 
+  # Snowflake defaults directory to ENABLE = true server-side. Pin it
+  # explicitly to prevent provider drift from forcing a stage replacement.
+  directory = "ENABLE = true"
+
   comment = "External stage on ${var.container_name} for company ${var.company_id} (${var.environment})."
 }
