@@ -6,7 +6,7 @@
 
 ## Context
 
-The project is multi-tenant by design — three "companies" with independent data feeds dropped into three Azure storage containers (`fsp-company-01/02/03`). Snowflake storage integrations are the object that binds a Snowflake account to an Azure storage principal; they require a manual consent step in the Azure portal (admin consent for the Snowflake service principal).
+The project is multi-tenant by design — three "companies" with independent data feeds dropped into three Azure storage containers (originally `fsp-company-01/02/03`, later renamed to `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`). Snowflake storage integrations are the object that binds a Snowflake account to an Azure storage principal; they require a manual consent step in the Azure portal (admin consent for the Snowflake service principal).
 
 The question: one shared storage integration covering all three containers, or one integration per company?
 
@@ -22,6 +22,6 @@ Chose **one shared storage integration** listing all three containers in `STORAG
 ## Consequences
 
 - Only one Azure admin-consent step to perform manually the first time we `terraform apply` the integration.
-- Per-company isolation must be rigorous at the stage and schema layers (`stg_company_NN_outbound` stages granted only to the matching access roles). This is the right place for it anyway.
+- Per-company isolation must be rigorous at the stage and schema layers (`STG_<COMPANY_NAME>` stages granted only to the matching access roles). This is the right place for it anyway.
 - If one company is later revoked or offboarded, we update `STORAGE_ALLOWED_LOCATIONS` to remove its container and reapply — slightly less clean than destroying a dedicated integration, but a five-line diff.
 - The blast radius of a compromised integration credential is all three containers rather than one. Acceptable for a portfolio; call out as a known tradeoff in the writeup. In a real production build for an unrelated-tenants scenario, per-tenant integrations would be the right call.

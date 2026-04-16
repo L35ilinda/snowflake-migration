@@ -140,28 +140,37 @@ resource monitors, Airflow
 - [x] Verified end-to-end: `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_MAIN_BOOK;` returns 6 CSVs
 - [x] `scripts/list_stage.py` added for programmatic stage verification
 
-### Pending
-- [ ] Build Terraform module: RBAC scaffolding (functional + access roles, never grant directly to users)
-- [ ] Build Terraform module: workload-separated warehouses (`LOAD_WH`, `TRANSFORM_WH`, `BI_WH`) with auto-suspend <= 60s
-- [ ] Build Terraform module: resource monitors (account-level and warehouse-level)
-- [ ] Configure Snowpipe for one company's files end to end
-- [ ] Define quarantine table pattern for rejected rows
-- [ ] Initialize dbt project and get `dbt debug` green with key-pair auth
-- [ ] First staging model built and tested against a RAW table
+- [x] `snowflake_rbac` module built and applied — 12 access roles (RW+RO per schema), 2 functional roles (`FR_ENGINEER`, `FR_ANALYST`), `LSILINDA` granted `FR_ENGINEER` (retains `ACCOUNTADMIN`)
+- [x] `snowflake_warehouses` module built and applied — `LOAD_WH`, `TRANSFORM_WH`, `BI_WH` (all XS, auto-suspend 60s, start suspended)
+- [x] Resource monitors: per-warehouse (`RM_LOAD_WH` 5cr, `RM_TRANSFORM_WH` 3cr, `RM_BI_WH` 2cr) + account backstop (`RM_DEV_ACCOUNT` 10cr)
+- [x] `snowflake_snowpipe` module built and applied — 6 all-VARCHAR landing tables + 6 Snowpipes for Main Book
+- [x] All 6 Main Book pipes refreshed, 600K rows loaded across 6 tables in `RAW_MAIN_BOOK`
+- [x] dbt-snowflake installed (Anaconda), `profiles.yml` with key-pair auth, `FR_ENGINEER` role, `TRANSFORM_WH`
+- [x] `dbt debug` — all checks passed
+- [x] 6 dbt staging models (views) in `ANALYTICS_DEV.STAGING` — type casting, PascalCase rename, source + model tests
+- [x] `generate_schema_name` macro — writes to `STAGING`/`CORE`/`MARTS` directly (no prefix)
+- [x] Tagged `v0.1.0-foundations`
+
+### Pending (Replicate Sources phase)
 - [ ] Onboard remaining 60 files from `fsp-data-onboarding-queue` (8 company groups + shared/reference tables)
+- [ ] Snowpipe for Indigo Insurance and Horizon Assurance datasets
+- [ ] Define quarantine table pattern for rejected rows
 - [ ] CI/CD pipelines validated end to end
+- [ ] Mock operational DB for Fivetran/Airbyte demonstration
 
 ### Snowflake current state
 - **Databases:** `ANALYTICS_DEV` (project, Terraform-managed), `FSP_DATA_INTEGRATION_DB` (sandbox, ignore), system databases
 - **Schemas in `ANALYTICS_DEV`:** `RAW_MAIN_BOOK`, `RAW_INDIGO_INSURANCE`, `RAW_HORIZON_ASSURANCE`, `STAGING`, `CORE`, `MARTS`
-- **Tables:** none in project DB yet; `FSP_DATA_INTEGRATION_DB.PUBLIC.MOCK_DATA` (ignore)
-- **Warehouses:** `COMPUTE_WH` (default, X-Small, auto-suspend 300s)
-- **Roles:** defaults only — no custom roles yet
+- **Tables in `RAW_MAIN_BOOK`:** 6 landing tables (all-VARCHAR + `_LOADED_AT`), 100K rows each: `MAIN_BOOK_INS_COMMISSIONS`, `MAIN_BOOK_INV_COMMISSIONS`, `MAIN_BOOK_RISK_BENEFITS`, `MAIN_BOOK_RISK_BENEFITS_TRANSACTIONS`, `MAIN_BOOK_VALUATION_TRANSACTIONS`, `MAIN_BOOK_VALUATIONS`
+- **Views in `STAGING`:** 6 dbt-managed staging views (`stg_main_book__*`) with type casting and PascalCase rename
+- **Warehouses:** `COMPUTE_WH` (default, XS, 300s), `LOAD_WH` (XS, 60s), `TRANSFORM_WH` (XS, 60s), `BI_WH` (XS, 60s)
+- **Resource monitors:** `RM_DEV_ACCOUNT` (10cr backstop), `RM_LOAD_WH` (5cr), `RM_TRANSFORM_WH` (3cr), `RM_BI_WH` (2cr)
+- **Roles:** `FR_ENGINEER` (all RW), `FR_ANALYST` (staging/core/marts RO), 12 access roles (`AR_ANALYTICS_DEV_<SCHEMA>_RW/RO`), plus Snowflake defaults
 - **Storage integrations:** `SI_AZURE_FSPSFTPSOURCE_DEV` (covers `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`)
 - **Stages:** `STG_MAIN_BOOK`, `STG_INDIGO_INSURANCE`, `STG_HORIZON_ASSURANCE` (in respective RAW schemas)
-- **Pipes:** none
+- **Pipes:** `PIPE_MAIN_BOOK_INS_COMMISSIONS`, `PIPE_MAIN_BOOK_INV_COMMISSIONS`, `PIPE_MAIN_BOOK_RISK_BENEFITS`, `PIPE_MAIN_BOOK_RISK_BENEFITS_TRANSACTIONS`, `PIPE_MAIN_BOOK_VALUATION_TRANSACTIONS`, `PIPE_MAIN_BOOK_VALUATIONS`
 - **File formats:** `FF_CSV_MAIN_BOOK`, `FF_CSV_INDIGO_INSURANCE`, `FF_CSV_HORIZON_ASSURANCE`
-- **Terraform-managed state:** storage integration, database, 6 schemas, 3 stages, 3 file formats, 4 Azure containers
+- **Terraform-managed state:** storage integration, database, 6 schemas, 3 stages, 3 file formats, 6 tables, 6 pipes, 14 roles, 3 warehouses, 4 resource monitors, 4 Azure containers
 
 ### Source data shape
 - **Total files:** ~80 CSVs across all containers + onboarding queue
@@ -185,7 +194,7 @@ resource monitors, Airflow
 - **Schemas:** UPPERCASE: `RAW_<COMPANY_NAME>`, `STAGING`, `CORE`, `MARTS`
 - **Tables and columns:** `lower_snake_case`
 - **Source tables in RAW:** prefixed with dataset type: `raw_main_book.commission`, `raw_indigo_insurance.insurance`
-- **dbt staging models:** `stg_company_NN__<dataset_type>.sql`
+- **dbt staging models:** `stg_<company_name>__<dataset_type>.sql` (e.g. `stg_main_book__valuations.sql`)
 - **dbt core models:** `dim_<entity>.sql`, `fct_<process>.sql`, `hub_/lnk_/sat_` for the Vault domain
 - **dbt marts:** `<domain>_<purpose>.sql`
 - **Warehouses:** `<PURPOSE>_WH` - `LOAD_WH`, `TRANSFORM_WH`, `BI_WH`, `ADHOC_WH`
@@ -216,23 +225,26 @@ resource monitors, Airflow
 
 ## 6. Next milestone
 
-**Foundations phase.** Get one source loaded end to end via the proper pipeline:
+**Replicate sources phase.** Expand ingest beyond Main Book to all companies and demonstrate DB replication.
 
 ```text
-Azure Storage (fsp-main-book) -> SI_AZURE_FSPSFTPSOURCE_DEV -> STG_MAIN_BOOK -> Snowpipe -> RAW_MAIN_BOOK -> dbt staging model
+Onboarding queue files -> assign to companies -> Snowpipe -> RAW_<COMPANY> -> dbt staging
+Mock operational DB -> Fivetran/Airbyte -> RAW_<SOURCE> -> dbt staging
 ```
 
 Concrete steps for the next session:
-1. Build Terraform module: minimal RBAC (`FR_ENGINEER` functional role + access roles for `ANALYTICS_DEV`).
-2. Build Terraform module: `LOAD_WH` (X-Small, auto-suspend 60s) and the first resource monitor.
-3. Initialize the dbt project, connect via env vars using key-pair auth, and get `dbt debug` green.
-4. Configure Snowpipe for Main Book file patterns plus quarantine handling.
-5. Drop a test file in `fsp-main-book/`, verify it lands in `RAW_MAIN_BOOK`.
-6. Build the first staging model in dbt and verify it runs against the RAW table.
-7. Tag this state as `v0.1.0-foundations`.
-8. Commit each step with a clear message.
+1. Decide how to assign the 8 remaining company groups (baobab, fynbos, etc.) to the three tenants — or add more tenants.
+2. Copy assigned files from `fsp-data-onboarding-queue` to their company containers.
+3. Inspect headers, create landing tables + Snowpipes for Indigo Insurance and Horizon Assurance.
+4. Build staging models for the two new companies.
+5. Decide on shared/reference table placement (shared container? all RAW schemas?).
+6. Define quarantine table pattern for rejected rows.
+7. Set up mock operational DB and configure Fivetran or Airbyte replication.
+8. Enable Snowpipe auto-ingest via Azure Event Grid (upgrade from manual refresh).
+9. Set up GitHub Actions CI/CD: `dbt build` on PR against a dev database.
+10. Tag `v0.2.0-replicate-sources` when complete.
 
-Once Foundations is green, the next milestone is **Replicate sources** — Snowpipe for the remaining company files (onboard from queue) plus a mock operational DB for Fivetran/Airbyte demonstration.
+Once Replicate Sources is green, the next milestone is **Model the warehouse** — rebuild DW logic in dbt with Star Schema in MARTS and one Data Vault domain in CORE.
 
 ## 7. How to interact with me (the user)
 
@@ -260,10 +272,10 @@ Once Foundations is green, the next milestone is **Replicate sources** — Snowp
 
 ## 9. Reference: phased roadmap
 
-1. **Foundations** <- currently here
+1. **Foundations** (COMPLETE — tagged `v0.1.0-foundations`)
    Snowflake account, RBAC, warehouses, Git, dbt skeleton, one source end to end.
-2. **Replicate sources**
-   All 70 files via Snowpipe (per company). Mock operational systems via Airbyte. External Tables for cold data.
+2. **Replicate sources** <- currently here
+   All files via Snowpipe (per company). Mock operational systems via Airbyte. External Tables for cold data.
 3. **Model the warehouse**
    Rebuild DW logic in dbt. Star Schema in MARTS, one Data Vault domain in CORE.
 4. **Serve**

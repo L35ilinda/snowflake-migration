@@ -45,9 +45,9 @@ AZURE_TENANT_ID=bc5006a1-0712-4769-a24f-3cc61c360e7e
 AZURE_RESOURCE_GROUP=snflk_training_rg
 AZURE_STORAGE_ACCOUNT=fspsftpsource
 AZURE_STORAGE_REGION=southafricanorth
-AZURE_CONTAINER_COMPANY_01=fsp-company-01
-AZURE_CONTAINER_COMPANY_02=fsp-company-02
-AZURE_CONTAINER_COMPANY_03=fsp-company-03
+AZURE_CONTAINER_MAIN_BOOK=fsp-main-book
+AZURE_CONTAINER_INDIGO_INSURANCE=fsp-indigo-insurance
+AZURE_CONTAINER_HORIZON_ASSURANCE=fsp-horizon-assurance
 ```
 
 ### Secrets policy
@@ -60,13 +60,13 @@ AZURE_CONTAINER_COMPANY_03=fsp-company-03
 
 ## Current status
 
-**Foundations** is in progress.
+**Foundations complete** — tagged `v0.1.0-foundations`. Full end-to-end pipeline live:
 
-- Applied already: Terraform bootstrap for remote state and the shared Snowflake storage integration `SI_AZURE_FSPSFTPSOURCE_DEV`.
-- Built in code but not yet applied: `ANALYTICS_DEV`, named RAW schemas, shared `STAGING`/`CORE`/`MARTS`, and the three per-company external stages plus CSV file formats.
-- Current Terraform plan in `terraform/environments/dev` is clean: `13 to add, 0 to change, 0 to destroy`.
-- Immediate next step: `terraform apply` in `terraform/environments/dev`, then verify stage access with `LIST @ANALYTICS_DEV.RAW_MAIN_BOOK.STG_COMPANY_01_OUTBOUND/Outbound;`.
+- `ANALYTICS_DEV` database with 6 schemas, RBAC (12 access roles, 2 functional roles), 3 workload-separated warehouses with per-warehouse resource monitors
+- 6 Snowpipes loading Main Book data (600K rows) into `RAW_MAIN_BOOK`
+- 6 dbt staging views in `STAGING` with type casting, tests, and source definitions
+- Storage integration, external stages, and file formats for all 3 companies
 
 ## Current phase
 
-**Foundations** - see [CLAUDE.md](CLAUDE.md) for the live checklist of what is done and what is next.
+**Replicate sources** — see [CLAUDE.md](CLAUDE.md) for the live checklist of what is done and what is next.

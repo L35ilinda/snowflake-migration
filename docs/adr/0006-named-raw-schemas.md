@@ -8,7 +8,7 @@
 
 The project started with placeholder-style raw schema names such as `RAW_COMPANY_01`, `RAW_COMPANY_02`, and `RAW_COMPANY_03`. That works mechanically, but it reads like scaffolding rather than an intentional enterprise platform. The portfolio story is stronger if the Snowflake layer reflects the tenant names that appear in the source-data dictionary and business narrative.
 
-At the same time, Azure container names are already provisioned as `fsp-company-01/02/03`, and those numeric identifiers are useful in Terraform because they preserve the mapping back to the physical landing containers.
+At the time of this decision, Azure container names were provisioned as `fsp-company-01/02/03`. These were later renamed to descriptive names (`fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`) and the numeric identifiers are now only used as Terraform map keys.
 
 ## Options considered
 
@@ -31,6 +31,6 @@ This keeps the Azure and storage side simple and already provisioned, while maki
 ## Consequences
 
 - Terraform's database-layer module now accepts a `company_id -> COMPANY_NAME` mapping instead of a bare list of numeric IDs.
-- Downstream ingest modules still use `company_id` for objects like `STG_COMPANY_01_OUTBOUND` and `FF_CSV_COMPANY_01`, preserving a clean link to the Azure containers.
+- Downstream ingest modules now use `company_name` for descriptive Snowflake object names (`STG_MAIN_BOOK`, `FF_CSV_MAIN_BOOK`). The `company_id` key is retained in Terraform for map iteration only.
 - Documentation must spell out the mapping explicitly so readers do not lose the multi-tenant pattern when they stop seeing `RAW_COMPANY_NN`.
 - Adding a new tenant now requires picking both a numeric ingest ID and a Snowflake-safe uppercase schema suffix.
