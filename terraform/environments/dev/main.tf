@@ -2,7 +2,7 @@ locals {
   companies = {
     "01" = {
       raw_schema_suffix = "MAIN_BOOK"
-      container_name    = var.azure_storage_container_company_01
+      container_name    = var.azure_storage_container_main_book
     }
     "02" = {
       raw_schema_suffix = "INDIGO_INSURANCE"
@@ -54,9 +54,10 @@ module "company_ingest" {
 }
 
 # ---- Azure blob containers ----
-# Manages containers in the existing storage account. Only add containers
-# here that are Terraform-managed; the three company containers were created
-# manually and can be imported later if desired.
+# Manages containers in the existing storage account. Company containers use
+# descriptive names (fsp-main-book, not fsp-company-01). Legacy generic
+# containers (fsp-company-01/02/03) are not Terraform-managed and can be
+# deleted once fully migrated.
 module "azure_containers" {
   source = "../../modules/azure_blob_containers"
 
@@ -65,5 +66,6 @@ module "azure_containers" {
 
   containers = {
     "fsp-data-onboarding-queue" = { access_type = "private" }
+    "fsp-main-book"             = { access_type = "private" }
   }
 }

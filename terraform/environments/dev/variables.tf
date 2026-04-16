@@ -8,7 +8,7 @@ variable "azure_subscription_id" { type = string }
 variable "azure_tenant_id" { type = string }
 variable "azure_resource_group_name" { type = string }
 variable "azure_storage_account_name" { type = string }
-variable "azure_storage_container_company_01" { type = string }
+variable "azure_storage_container_main_book" { type = string }
 variable "azure_storage_container_company_02" { type = string }
 variable "azure_storage_container_company_03" { type = string }
 
