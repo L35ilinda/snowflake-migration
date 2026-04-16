@@ -1,0 +1,62 @@
+version: 2
+
+sources:
+  - name: raw_main_book
+    database: ANALYTICS_DEV
+    schema: RAW_MAIN_BOOK
+    description: Raw landing tables for Main Book company. All columns VARCHAR, loaded via Snowpipe.
+
+    tables:
+      - name: main_book_ins_commissions
+        description: Insurance commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: main_book_inv_commissions
+        description: Investment commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: main_book_risk_benefits
+        description: Risk benefit policies (life, disability, chronic, accident).
+        columns:
+          - name: policynumber
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: main_book_risk_benefits_transactions
+        description: Transactions against risk benefit policies.
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: main_book_valuation_transactions
+        description: Investment fund transactions (contributions, withdrawals, fees).
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: main_book_valuations
+        description: Investment portfolio valuations per fund per period.
+        columns:
+          - name: policy_number
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn

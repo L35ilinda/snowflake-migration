@@ -1,0 +1,90 @@
+version: 2
+
+models:
+  - name: stg_main_book__valuations
+    description: Typed investment portfolio valuations per fund per period.
+    columns:
+      - name: policy_number
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: valuation_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: market_value_amount
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+  - name: stg_main_book__ins_commissions
+    description: Typed insurance commission records.
+    columns:
+      - name: commission_id
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_main_book__inv_commissions
+    description: Typed investment commission records.
+    columns:
+      - name: commission_id
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_main_book__risk_benefits
+    description: Typed risk benefit policies (life, disability, chronic, accident). Columns renamed from PascalCase.
+    columns:
+      - name: policy_number
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: inception_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+  - name: stg_main_book__risk_benefits_transactions
+    description: Typed transactions against risk benefit policies.
+    columns:
+      - name: transaction_id
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - unique:
+              config:
+                severity: warn
+      - name: transaction_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+  - name: stg_main_book__valuation_transactions
+    description: Typed investment fund transactions (contributions, withdrawals, fees).
+    columns:
+      - name: transaction_id
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - unique:
+              config:
+                severity: warn
+      - name: transaction_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: amount
+        data_tests:
+          - not_null:
+              config:
+                severity: warn

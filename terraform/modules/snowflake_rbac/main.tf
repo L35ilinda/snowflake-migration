@@ -143,6 +143,19 @@ resource "snowflake_grant_privileges_to_account_role" "schema_create" {
   }
 }
 
+# RW roles: CREATE SCHEMA on database (dbt runs CREATE SCHEMA IF NOT EXISTS).
+resource "snowflake_grant_privileges_to_account_role" "database_create_schema" {
+  for_each = { for k, v in local.access_roles : k => v if v.privilege == "RW" }
+
+  account_role_name = snowflake_account_role.access[each.key].name
+  privileges        = ["CREATE SCHEMA"]
+
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = var.database_name
+  }
+}
+
 # --- Functional roles ---
 
 resource "snowflake_account_role" "functional" {
