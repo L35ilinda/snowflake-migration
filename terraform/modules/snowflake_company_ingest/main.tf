@@ -8,8 +8,8 @@ terraform {
 }
 
 locals {
-  file_format_name = "FF_CSV_COMPANY_${var.company_id}"
-  stage_name       = "STG_COMPANY_${var.company_id}_OUTBOUND"
+  file_format_name = "FF_CSV_${var.company_name}"
+  stage_name       = "STG_${var.company_name}"
   stage_url        = "azure://${var.storage_account_name}.blob.core.windows.net/${var.container_name}/"
 }
 
@@ -31,7 +31,7 @@ resource "snowflake_file_format" "csv" {
   error_on_column_count_mismatch = false
   replace_invalid_characters     = true
 
-  comment = "CSV file format for company ${var.company_id} outbound feed (${var.environment})."
+  comment = "CSV file format for ${var.company_name} (${var.environment})."
 }
 
 resource "snowflake_stage" "outbound" {
@@ -46,5 +46,5 @@ resource "snowflake_stage" "outbound" {
   # explicitly to prevent provider drift from forcing a stage replacement.
   directory = "ENABLE = true"
 
-  comment = "External stage on ${var.container_name} for company ${var.company_id} (${var.environment})."
+  comment = "External stage on ${var.container_name} for ${var.company_name} (${var.environment})."
 }

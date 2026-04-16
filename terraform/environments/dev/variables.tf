@@ -9,8 +9,8 @@ variable "azure_tenant_id" { type = string }
 variable "azure_resource_group_name" { type = string }
 variable "azure_storage_account_name" { type = string }
 variable "azure_storage_container_main_book" { type = string }
-variable "azure_storage_container_company_02" { type = string }
-variable "azure_storage_container_company_03" { type = string }
+variable "azure_storage_container_indigo_insurance" { type = string }
+variable "azure_storage_container_horizon_assurance" { type = string }
 
 # ---- Snowflake ----
 variable "snowflake_organization_name" { type = string }

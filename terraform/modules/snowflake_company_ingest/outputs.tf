@@ -5,7 +5,7 @@ output "file_format_name" {
 
 output "stage_name" {
   value       = snowflake_stage.outbound.name
-  description = "External stage name for this company's outbound feed."
+  description = "External stage name for this company."
 }
 
 output "stage_fully_qualified_name" {
