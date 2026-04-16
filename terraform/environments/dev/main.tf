@@ -185,3 +185,86 @@ module "warehouses" {
     }
   }
 }
+
+# ---- Snowpipe: Main Book ----
+# Landing tables (all-VARCHAR) + pipes for each Main Book dataset.
+# Pipes use ON_ERROR=CONTINUE and MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE.
+module "main_book_pipes" {
+  source = "../../modules/snowflake_snowpipe"
+
+  database_name    = module.database_layers.database_name
+  raw_schema_name  = module.database_layers.raw_schema_names["01"]
+  stage_name       = module.company_ingest["01"].stage_name
+  file_format_name = module.company_ingest["01"].file_format_name
+  environment      = var.environment
+
+  datasets = {
+    main_book_ins_commissions = {
+      file_pattern = ".*main_book_ins_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    main_book_inv_commissions = {
+      file_pattern = ".*main_book_inv_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    main_book_risk_benefits = {
+      file_pattern = ".*main_book_risk_benefits\\\\.csv"
+      columns = [
+        "policynumber", "inceptiondate", "policystatus", "memberid",
+        "agenext", "smokerstatus", "incomebrackets", "life_sumassured",
+        "life_premium", "disability_type", "disability_sumassured",
+        "disability_premium", "chronic_level", "chronic_waitingperiod",
+        "chronic_premium", "accident_benefit", "accident_premium",
+        "total_monthlypremium", "commission_rate", "advisor_identifier",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    main_book_risk_benefits_transactions = {
+      file_pattern = ".*main_book_risk_benefits_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "member_id", "transaction_type",
+        "transaction_date", "amount", "status", "reference_number",
+        "narrative", "claim_type", "claim_reason", "benefit_affected",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    main_book_valuation_transactions = {
+      file_pattern = ".*main_book_valuation_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "client_id_number", "fund_code",
+        "transaction_type", "transaction_date", "amount", "units",
+        "price_per_unit", "status", "reference_number", "source_fund",
+        "narrative", "client_title", "client_first_name", "client_surname",
+        "client_initials"
+      ]
+    }
+
+    main_book_valuations = {
+      file_pattern = ".*main_book_valuations.*[.]csv"
+      columns = [
+        "advisor_identifier", "client_title", "client_first_name",
+        "client_surname", "client_initials", "client_id_number",
+        "policy_number", "product_name", "product_code", "fund_name",
+        "fund_code", "jse_code", "valuation_date", "currency",
+        "market_value_amount", "units", "anniversary_month",
+        "monthly_income_amount", "monthly_income_pct", "income_frequency"
+      ]
+    }
+  }
+}

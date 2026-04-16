@@ -36,5 +36,7 @@ provider "snowflake" {
     "snowflake_storage_integration_resource",
     "snowflake_stage_resource",
     "snowflake_file_format_resource",
+    "snowflake_pipe_resource",
+    "snowflake_table_resource",
   ]
 }
