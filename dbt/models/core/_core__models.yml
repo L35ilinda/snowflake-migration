@@ -204,6 +204,40 @@ models:
               config:
                 severity: warn
 
+  - name: dim_policy
+    description: >
+      Conformed policy dimension covering two policy universes:
+      RISK (full master data from risk_benefits/insurance/assurance
+      tables, prefix RB*/IND*/HZR*) and INVESTMENT (minimal attributes,
+      policy_number only, referenced in valuations and transactions,
+      prefix POL*/INV*/HZV*).
+
+      Materialized Type 1. Type 2-ready columns (is_current, valid_from,
+      valid_to) included with defaults so we can transition to dbt
+      snapshots later without restructuring facts.
+    columns:
+      - name: policy_sk
+        description: Surrogate key. Hash of (company, policy_number).
+        data_tests:
+          - not_null
+          - unique
+      - name: policy_number
+        data_tests:
+          - not_null
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: policy_universe
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['RISK', 'INVESTMENT']
+      - name: is_current
+        data_tests:
+          - not_null
+
   - name: dim_client
     description: >
       Conformed client dimension. Sourced from valuations and transactions
