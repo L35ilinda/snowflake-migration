@@ -474,3 +474,55 @@ module "masking_policies" {
 
   depends_on = [module.database_layers]
 }
+
+# ---- ANALYTICS_CI database (for GitHub Actions dbt builds) ----
+# Dedicated database so CI cannot corrupt dev artifacts. See ADR-0009.
+# Only the database is created here — dbt creates STAGING/CORE/MARTS
+# schemas at runtime under CI_SVC ownership.
+resource "snowflake_database" "analytics_ci" {
+  name    = "ANALYTICS_CI"
+  comment = "CI build target for dbt runs from GitHub Actions. See ADR-0009."
+}
+
+# Grant USAGE + CREATE SCHEMA on ANALYTICS_CI to FR_ENGINEER so dbt (running
+# as CI_SVC → FR_ENGINEER) can create and populate schemas.
+resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_usage" {
+  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.analytics_ci.name
+  }
+}
+
+resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_create_schema" {
+  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+  privileges        = ["CREATE SCHEMA"]
+
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.analytics_ci.name
+  }
+}
+
+# ---- CI_SVC service user ----
+# Dedicated service user for GitHub Actions. Uses its own key pair for
+# rotation/audit separation from developer users. See ADR-0009.
+resource "snowflake_user" "ci_svc" {
+  name          = "CI_SVC"
+  login_name    = "CI_SVC"
+  display_name  = "CI service account (GitHub Actions)"
+  comment       = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
+  disabled      = "false"
+
+  default_role      = module.rbac.functional_role_names["FR_ENGINEER"]
+  default_warehouse = module.warehouses.warehouse_names["TRANSFORM_WH"]
+
+  rsa_public_key = file(var.ci_svc_public_key_path)
+}
+
+resource "snowflake_grant_account_role" "ci_svc_fr_engineer" {
+  role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+  user_name = snowflake_user.ci_svc.name
+}

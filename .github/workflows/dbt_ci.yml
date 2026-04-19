@@ -1,0 +1,73 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'dbt/**'
+      - '.github/workflows/dbt_ci.yml'
+
+jobs:
+  dbt-build:
+    name: dbt build against ANALYTICS_CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dbt
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dbt-snowflake
+        run: pip install dbt-snowflake
+
+      - name: Write private key from secret
+        run: |
+          mkdir -p ~/.snowflake
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" | base64 --decode > ~/.snowflake/ci_svc_rsa_key.p8
+          chmod 600 ~/.snowflake/ci_svc_rsa_key.p8
+
+      - name: Write profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<'EOF'
+          snowflake_migration:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+                user: "${{ secrets.SNOWFLAKE_USER }}"
+                role: "${{ secrets.SNOWFLAKE_ROLE }}"
+                warehouse: "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
+                database: "${{ secrets.SNOWFLAKE_DATABASE }}"
+                schema: STAGING
+                authenticator: snowflake_jwt
+                private_key_path: /home/runner/.snowflake/ci_svc_rsa_key.p8
+                threads: 4
+          EOF
+
+      - name: dbt deps
+        run: dbt deps --target ci
+
+      - name: dbt debug
+        run: dbt debug --target ci
+
+      - name: dbt build
+        run: dbt build --target ci --fail-fast
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-target
+          path: dbt/target/
+          retention-days: 7

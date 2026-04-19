@@ -70,3 +70,37 @@ AZURE_CONTAINER_HORIZON_ASSURANCE=fsp-horizon-assurance
 ## Current phase
 
 **Replicate sources** — see [CLAUDE.md](CLAUDE.md) for the live checklist of what is done and what is next.
+
+## GitHub Actions CI
+
+Every PR to `master` runs `dbt build` against a dedicated `ANALYTICS_CI` database via `.github/workflows/dbt_ci.yml`. Architecture and rationale: [ADR-0009](docs/adr/0009-ci-architecture.md).
+
+### Required GitHub repository secrets
+
+Configure these at **Settings → Secrets and variables → Actions**:
+
+| Secret | Value | Notes |
+|--------|-------|-------|
+| `SNOWFLAKE_ACCOUNT` | `VNCENFN-XF07416` | Org-account identifier |
+| `SNOWFLAKE_USER` | `CI_SVC` | Dedicated service user |
+| `SNOWFLAKE_ROLE` | `FR_ENGINEER` | Functional role |
+| `SNOWFLAKE_WAREHOUSE` | `TRANSFORM_WH` | Bound to `RM_TRANSFORM_WH` monitor |
+| `SNOWFLAKE_DATABASE` | `ANALYTICS_CI` | CI build target (separate from dev) |
+| `SNOWFLAKE_PRIVATE_KEY` | *base64-encoded PEM* | See generation steps below |
+
+### Generating the CI_SVC private key secret
+
+The `CI_SVC` Snowflake user is provisioned by Terraform with the public key from `~/.snowflake/keys/ci_svc_rsa_key.pub`. To let GitHub Actions authenticate as `CI_SVC`, encode the matching private key:
+
+**PowerShell:**
+```powershell
+$privateKeyPath = "$env:USERPROFILE\.snowflake\keys\ci_svc_rsa_key.p8"
+[Convert]::ToBase64String([IO.File]::ReadAllBytes($privateKeyPath)) | Set-Clipboard
+```
+
+Paste the clipboard contents as the `SNOWFLAKE_PRIVATE_KEY` secret. GitHub Actions base64-decodes it back into a PEM file at runtime.
+
+**Bash (Git Bash / WSL):**
+```bash
+base64 -w0 < ~/.snowflake/keys/ci_svc_rsa_key.p8
+```

@@ -25,3 +25,11 @@ variable "snowflake_private_key_path" {
   type        = string
   description = "Absolute path to the PKCS#8 RSA private key used for SNOWFLAKE_JWT auth. Must live outside the repo. See ADR-0005."
 }
+
+# ---- CI service user ----
+# Public key for the CI_SVC user (used by GitHub Actions). Register the
+# matching private key as a GitHub repository secret. See ADR-0009.
+variable "ci_svc_public_key_path" {
+  type        = string
+  description = "Absolute path to the CI_SVC public key file (PEM, no PEM headers). Must live outside the repo."
+}
