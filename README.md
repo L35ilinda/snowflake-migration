@@ -71,6 +71,10 @@ AZURE_CONTAINER_HORIZON_ASSURANCE=fsp-horizon-assurance
 
 **Replicate sources** — see [CLAUDE.md](CLAUDE.md) for the live checklist of what is done and what is next.
 
+## Replicating this project
+
+If you are rebuilding a similar Snowflake + Azure + dbt stack, start with [**docs/log/issues-and-fixes.md**](docs/log/issues-and-fixes.md). It's a de-duplicated catalogue of every non-trivial blocker we hit, with root cause and fix, so you can avoid repeating them.
+
 ## GitHub Actions CI
 
 Every PR to `master` runs `dbt build` against a dedicated `ANALYTICS_CI` database via `.github/workflows/dbt_ci.yml`. Architecture and rationale: [ADR-0009](docs/adr/0009-ci-architecture.md).
