@@ -1,15 +1,15 @@
 locals {
   companies = {
     "01" = {
-      company_name = "MAIN_BOOK"
+      company_name   = "MAIN_BOOK"
       container_name = var.azure_storage_container_main_book
     }
     "02" = {
-      company_name = "INDIGO_INSURANCE"
+      company_name   = "INDIGO_INSURANCE"
       container_name = var.azure_storage_container_indigo_insurance
     }
     "03" = {
-      company_name = "HORIZON_ASSURANCE"
+      company_name   = "HORIZON_ASSURANCE"
       container_name = var.azure_storage_container_horizon_assurance
     }
   }
@@ -137,9 +137,9 @@ module "warehouses" {
       grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
     }
     BI_WH = {
-      size           = "XSMALL"
-      auto_suspend   = 60
-      comment        = "BI and ad-hoc queries."
+      size         = "XSMALL"
+      auto_suspend = 60
+      comment      = "BI and ad-hoc queries."
       grant_usage_to = [
         module.rbac.functional_role_names["FR_ENGINEER"],
         module.rbac.functional_role_names["FR_ANALYST"],
@@ -477,7 +477,7 @@ module "masking_policies" {
           else '***MASKED***'
         end
       SQL
-      comment = "Redact string PII (names, IDs) for non-privileged roles."
+      comment     = "Redact string PII (names, IDs) for non-privileged roles."
     }
 
     MP_MASK_DATE_PII = {
@@ -489,7 +489,7 @@ module "masking_policies" {
           else date_trunc('year', val)
         end
       SQL
-      comment = "Truncate date PII (birth_date) to year for non-privileged roles."
+      comment     = "Truncate date PII (birth_date) to year for non-privileged roles."
     }
   }
 
@@ -547,11 +547,11 @@ resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_c
 # Dedicated service user for GitHub Actions. Uses its own key pair for
 # rotation/audit separation from developer users. See ADR-0009.
 resource "snowflake_user" "ci_svc" {
-  name          = "CI_SVC"
-  login_name    = "CI_SVC"
-  display_name  = "CI service account (GitHub Actions)"
-  comment       = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
-  disabled      = "false"
+  name         = "CI_SVC"
+  login_name   = "CI_SVC"
+  display_name = "CI service account (GitHub Actions)"
+  comment      = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
+  disabled     = "false"
 
   default_role      = module.rbac.functional_role_names["FR_ENGINEER"]
   default_warehouse = module.warehouses.warehouse_names["TRANSFORM_WH"]

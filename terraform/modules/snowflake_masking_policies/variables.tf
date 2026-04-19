@@ -10,10 +10,10 @@ variable "schema_name" {
 
 variable "policies" {
   type = map(object({
-    signature  = string
-    body       = string
+    signature   = string
+    body        = string
     return_type = string
-    comment    = optional(string, "")
+    comment     = optional(string, "")
   }))
   description = <<-DOC
     Map of policy name -> definition. signature is the column argument list

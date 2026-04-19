@@ -13,13 +13,13 @@ variable "warehouses" {
 
 variable "resource_monitors" {
   type = map(object({
-    credit_quota          = number
-    notify_triggers       = optional(list(number), [75, 90, 100])
-    suspend_trigger       = optional(number, null)
+    credit_quota              = number
+    notify_triggers           = optional(list(number), [75, 90, 100])
+    suspend_trigger           = optional(number, null)
     suspend_immediate_trigger = optional(number, null)
-    frequency             = optional(string, "MONTHLY")
-    start_timestamp       = optional(string, null)
-    warehouses            = optional(list(string), [])
+    frequency                 = optional(string, "MONTHLY")
+    start_timestamp           = optional(string, null)
+    warehouses                = optional(list(string), [])
   }))
   description = "Map of resource monitor name -> config. warehouses lists which warehouses to attach."
   default     = {}
