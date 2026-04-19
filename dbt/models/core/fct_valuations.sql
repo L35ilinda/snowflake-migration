@@ -106,6 +106,14 @@ with valuations_union as (
             then to_char(valuation_date, 'YYYYMMDD')::int
           end as date_sk
 
+        , case when policy_number is not null
+            then {{ dbt_utils.generate_surrogate_key(['company', 'policy_number']) }}
+          end as policy_sk
+
+        , case when client_id_number is not null
+            then {{ dbt_utils.generate_surrogate_key(['company', 'client_id_number']) }}
+          end as client_sk
+
         -- Degenerate and descriptive columns
         , company
         , policy_number

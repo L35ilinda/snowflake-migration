@@ -46,6 +46,22 @@ models:
               field: advisor_sk
               config:
                 severity: warn
+      - name: policy_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_policy')
+              field: policy_sk
+              config:
+                severity: warn
+                where: "policy_sk is not null"
+      - name: date_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+              config:
+                severity: warn
+                where: "date_sk is not null"
       - name: commission_id
         data_tests:
           - not_null
@@ -183,6 +199,22 @@ models:
               config:
                 severity: warn
                 where: "date_sk is not null"
+      - name: policy_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_policy')
+              field: policy_sk
+              config:
+                severity: warn
+                where: "policy_sk is not null"
+      - name: client_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_client')
+              field: client_sk
+              config:
+                severity: warn
+                where: "client_sk is not null"
       - name: company
         data_tests:
           - not_null
@@ -237,6 +269,102 @@ models:
       - name: is_current
         data_tests:
           - not_null
+
+  - name: fct_transactions
+    description: >
+      Conformed transactions fact. Two universes: RISK (risk_benefits/
+      insurance transactions) and INVESTMENT (valuation transactions).
+      Union into a single fact with `transaction_category`.
+      Universe-specific columns (member_id, claim_*, benefit_affected for
+      RISK; fund_code, units, price_per_unit, source_fund for INVESTMENT)
+      are null for the other universe.
+    columns:
+      - name: transaction_sk
+        description: Surrogate key. Hash of (company, transaction_id).
+        data_tests:
+          - not_null
+          - unique
+      - name: policy_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_policy')
+              field: policy_sk
+              config:
+                severity: warn
+                where: "policy_sk is not null"
+      - name: client_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_client')
+              field: client_sk
+              config:
+                severity: warn
+                where: "client_sk is not null"
+      - name: fund_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_fund')
+              field: fund_sk
+              config:
+                severity: warn
+                where: "fund_sk is not null"
+      - name: date_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+              config:
+                severity: warn
+                where: "date_sk is not null"
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: transaction_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['RISK', 'INVESTMENT']
+      - name: transaction_id
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fct_policies
+    description: >
+      Accumulating snapshot fact at policy grain. One row per policy, with
+      dim_policy attributes plus lifetime roll-ups from fct_commissions,
+      fct_valuations (including latest market value), and fct_transactions.
+      snapshot_date = dbt run date; every row is a "today" snapshot.
+      When true periodic history is needed, write to fct_policy_snapshots
+      with snapshot_date as part of grain.
+    columns:
+      - name: policy_sk
+        description: PK. 1:1 with dim_policy.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('dim_policy')
+              field: policy_sk
+      - name: date_sk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: policy_universe
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['RISK', 'INVESTMENT']
 
   - name: dim_client
     description: >

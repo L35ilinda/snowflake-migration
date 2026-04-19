@@ -78,8 +78,14 @@ with commissions_union as (
 , enriched as (
 
     select
-        {{ dbt_utils.generate_surrogate_key(['company', 'commission_id']) }} as commission_sk
-        , {{ dbt_utils.generate_surrogate_key(['company', 'advisor_identifier']) }} as advisor_sk
+        {{ dbt_utils.generate_surrogate_key(['c.company', 'c.commission_id']) }} as commission_sk
+        , {{ dbt_utils.generate_surrogate_key(['c.company', 'c.advisor_identifier']) }} as advisor_sk
+        , case when c.policy_number is not null
+            then {{ dbt_utils.generate_surrogate_key(['c.company', 'c.policy_number']) }}
+          end as policy_sk
+        , case when c.transaction_date is not null
+            then to_char(c.transaction_date, 'YYYYMMDD')::int
+          end as date_sk
         , c.company
         , c.commission_category
         , c.commission_id

@@ -110,7 +110,9 @@ module "rbac" {
   }
 
   user_grants = {
-    LSILINDA = ["FR_ENGINEER"]
+    # LSILINDA holds both functional roles so we can test analyst-facing
+    # artefacts (e.g. dim_client masking policies) without a second user.
+    LSILINDA = ["FR_ENGINEER", "FR_ANALYST"]
   }
 }
 
@@ -432,4 +434,43 @@ module "horizon_assurance_pipes" {
       ]
     }
   }
+}
+
+# ---- Masking policies ----
+# Dynamic masking for PII in dim_client. Privileged roles (FR_ENGINEER,
+# ACCOUNTADMIN) see clear values; other roles see masked output.
+module "masking_policies" {
+  source = "../../modules/snowflake_masking_policies"
+
+  database_name = module.database_layers.database_name
+  schema_name   = module.database_layers.core_schema_name
+  environment   = var.environment
+
+  policies = {
+    MP_MASK_STRING_PII = {
+      signature   = "val VARCHAR"
+      return_type = "VARCHAR"
+      body        = <<-SQL
+        case
+          when current_role() in ('FR_ENGINEER', 'ACCOUNTADMIN') then val
+          else '***MASKED***'
+        end
+      SQL
+      comment = "Redact string PII (names, IDs) for non-privileged roles."
+    }
+
+    MP_MASK_DATE_PII = {
+      signature   = "val DATE"
+      return_type = "DATE"
+      body        = <<-SQL
+        case
+          when current_role() in ('FR_ENGINEER', 'ACCOUNTADMIN') then val
+          else date_trunc('year', val)
+        end
+      SQL
+      comment = "Truncate date PII (birth_date) to year for non-privileged roles."
+    }
+  }
+
+  depends_on = [module.database_layers]
 }

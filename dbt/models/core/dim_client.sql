@@ -1,3 +1,15 @@
+{{
+    config(
+        post_hook=[
+            "alter table {{ this }} alter column client_id_number set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+            "alter table {{ this }} alter column client_first_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+            "alter table {{ this }} alter column client_surname set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+            "alter table {{ this }} alter column client_full_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+            "alter table {{ this }} alter column birth_date set masking policy ANALYTICS_DEV.CORE.MP_MASK_DATE_PII"
+        ]
+    )
+}}
+
 {#
     Conformed client dimension.
 
