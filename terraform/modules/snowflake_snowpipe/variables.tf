@@ -30,3 +30,9 @@ variable "environment" {
   type        = string
   description = "Environment name, used in comments only."
 }
+
+variable "notification_integration_name" {
+  type        = string
+  description = "Snowflake notification integration name for Snowpipe AUTO_INGEST. When null, pipes stay manual-refresh only."
+  default     = null
+}

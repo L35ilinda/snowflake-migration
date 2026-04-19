@@ -38,5 +38,6 @@ provider "snowflake" {
     "snowflake_file_format_resource",
     "snowflake_pipe_resource",
     "snowflake_table_resource",
+    "snowflake_notification_integration_resource",
   ]
 }

@@ -188,17 +188,36 @@ module "warehouses" {
   }
 }
 
+# ---- Snowpipe auto-ingest (Event Grid → Storage Queue → Snowflake) ----
+# Shared notification integration used by every pipe across all companies.
+# See ADR-0010.
+module "snowpipe_notifications" {
+  source = "../../modules/snowpipe_azure_notifications"
+
+  name                           = upper("ni_azure_fspsftpsource_${var.environment}")
+  storage_account_name           = var.azure_storage_account_name
+  storage_account_resource_group = var.azure_resource_group_name
+  azure_tenant_id                = var.azure_tenant_id
+
+  # Only CSVs from our fsp-* containers should trigger Snowpipe.
+  subject_prefix = "/blobServices/default/containers/fsp-"
+  subject_suffix = ".csv"
+
+  environment = var.environment
+}
+
 # ---- Snowpipe: Main Book ----
 # Landing tables (all-VARCHAR) + pipes for each Main Book dataset.
 # Pipes use ON_ERROR=CONTINUE and MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE.
 module "main_book_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["01"]
-  stage_name       = module.company_ingest["01"].stage_name
-  file_format_name = module.company_ingest["01"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["01"]
+  stage_name                    = module.company_ingest["01"].stage_name
+  file_format_name              = module.company_ingest["01"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     main_book_ins_commissions = {
@@ -275,11 +294,12 @@ module "main_book_pipes" {
 module "indigo_insurance_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["02"]
-  stage_name       = module.company_ingest["02"].stage_name
-  file_format_name = module.company_ingest["02"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["02"]
+  stage_name                    = module.company_ingest["02"].stage_name
+  file_format_name              = module.company_ingest["02"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     indigo_ins_commissions = {
@@ -358,11 +378,12 @@ module "indigo_insurance_pipes" {
 module "horizon_assurance_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["03"]
-  stage_name       = module.company_ingest["03"].stage_name
-  file_format_name = module.company_ingest["03"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["03"]
+  stage_name                    = module.company_ingest["03"].stage_name
+  file_format_name              = module.company_ingest["03"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     horizon_ins_commissions = {
