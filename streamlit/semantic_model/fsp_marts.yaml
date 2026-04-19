@@ -1,0 +1,317 @@
+name: fsp_marts
+description: >
+  Business-ready marts for a multi-tenant financial services platform
+  covering commissions (finance), assets under management (portfolio), and
+  risk-policy book (risk). Three tenants: MAIN_BOOK, INDIGO_INSURANCE,
+  HORIZON_ASSURANCE.
+
+tables:
+  # -----------------------------------------------------------------
+  # FINANCE — advisor commission performance by month
+  # -----------------------------------------------------------------
+  - name: advisor_commissions_monthly
+    description: >
+      Commission performance per advisor per month per category. One row per
+      (tenant, advisor, month, commission_category). Use this to answer
+      questions about advisor productivity, commission trends over time,
+      and year-on-year changes.
+    base_table:
+      database: ANALYTICS_DEV
+      schema: MARTS
+      table: FINANCE_ADVISOR_COMMISSIONS_MONTHLY
+    synonyms: [commissions, advisor performance, broker earnings]
+
+    dimensions:
+      - name: company
+        synonyms: [tenant, business, firm]
+        description: Tenant name. One of MAIN_BOOK, INDIGO_INSURANCE, HORIZON_ASSURANCE.
+        expr: company
+        data_type: VARCHAR
+        sample_values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+
+      - name: advisor_identifier
+        synonyms: [advisor, broker, agent, advisor code]
+        description: Advisor code (e.g. ADV0180, MBK0397, INI0134, HRZ0022).
+        expr: advisor_identifier
+        data_type: VARCHAR
+
+      - name: commission_category
+        synonyms: [category, product line, type]
+        description: Whether the commission was for an insurance or investment product.
+        expr: commission_category
+        data_type: VARCHAR
+        sample_values: ['INSURANCE', 'INVESTMENT']
+
+    time_dimensions:
+      - name: year_month
+        synonyms: [month, period, billing month]
+        description: Month-start date for the aggregation (first day of the month).
+        expr: year_month
+        data_type: DATE
+
+    measures:
+      - name: commission_count
+        synonyms: [number of commissions, commission volume, deal count]
+        description: Number of individual commission payouts in the month.
+        expr: commission_count
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: commission_gross_total
+        synonyms: [gross commissions, total commissions before VAT]
+        description: Sum of gross commission amounts in rand, pre-VAT.
+        expr: commission_gross_total
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: commission_net_total
+        synonyms: [net commissions, net earnings, payout, take-home]
+        description: Sum of net commission amounts in rand after deductions.
+        expr: commission_net_total
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: avg_commission_amount
+        synonyms: [average commission, average deal size]
+        description: Average net commission per payout within this (advisor, month, category).
+        expr: avg_commission_amount
+        data_type: NUMBER
+        default_aggregation: avg
+
+      - name: running_net_total
+        synonyms: [cumulative commissions, lifetime net]
+        description: Cumulative net commission per advisor per category, month-over-month. Already pre-computed — do not sum.
+        expr: running_net_total
+        data_type: NUMBER
+
+      - name: pct_change_yoy
+        synonyms: [year-on-year change, YoY growth, YoY delta]
+        description: Percentage change in net commissions vs the same month last year. Pre-computed per row.
+        expr: pct_change_yoy
+        data_type: NUMBER
+
+  # -----------------------------------------------------------------
+  # PORTFOLIO — AUM trends per fund per month
+  # -----------------------------------------------------------------
+  - name: aum_monthly
+    description: >
+      Monthly assets-under-management (AUM) snapshot per fund per tenant.
+      One row per (tenant, fund, year_month). Use this for fund concentration,
+      AUM trends, month-on-month growth, and ETF vs unit-trust analysis.
+    base_table:
+      database: ANALYTICS_DEV
+      schema: MARTS
+      table: PORTFOLIO_AUM_MONTHLY
+    synonyms: [assets under management, portfolio, fund book]
+
+    dimensions:
+      - name: company
+        synonyms: [tenant, business]
+        description: Tenant name.
+        expr: company
+        data_type: VARCHAR
+        sample_values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+
+      - name: fund_name
+        synonyms: [fund, investment]
+        description: Full investment fund name, e.g. "Old Mutual Balanced Fund".
+        expr: fund_name
+        data_type: VARCHAR
+
+      - name: fund_type
+        synonyms: [investment vehicle, product structure]
+        description: ETF or UNIT_TRUST. ETF if the fund has a JSE code.
+        expr: fund_type
+        data_type: VARCHAR
+        sample_values: ['ETF', 'UNIT_TRUST']
+
+      - name: jse_code
+        synonyms: [ticker, JSE ticker, exchange code]
+        description: JSE ticker for ETFs. Null for unlisted unit trusts.
+        expr: jse_code
+        data_type: VARCHAR
+
+    time_dimensions:
+      - name: year_month
+        synonyms: [month, period, as-of month]
+        description: Month-start date of the AUM snapshot.
+        expr: year_month
+        data_type: DATE
+
+    measures:
+      - name: aum_amount
+        synonyms: [AUM, assets, book value, market value total]
+        description: Total market value in rand at month-end.
+        expr: aum_amount
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: unique_policies
+        synonyms: [policies invested, investor count on this fund]
+        description: Distinct policies holding this fund in this month.
+        expr: unique_policies
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: unique_clients
+        synonyms: [clients invested, number of clients]
+        description: Distinct clients holding this fund in this month.
+        expr: unique_clients
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: aum_mom_change
+        synonyms: [MoM change, month-on-month change, net flow]
+        description: Absolute rand change in AUM vs the prior month. Pre-computed.
+        expr: aum_mom_change
+        data_type: NUMBER
+
+      - name: aum_mom_pct_change
+        synonyms: [MoM %, monthly growth, month-on-month growth rate]
+        description: Percentage change in AUM vs prior month. Pre-computed.
+        expr: aum_mom_pct_change
+        data_type: NUMBER
+
+      - name: aum_12m_avg
+        synonyms: [12-month trailing average, TTM average, rolling AUM]
+        description: 12-month trailing average of AUM (including current month).
+        expr: aum_12m_avg
+        data_type: NUMBER
+
+  # -----------------------------------------------------------------
+  # RISK — policy-book snapshot by status and demographic
+  # -----------------------------------------------------------------
+  - name: policy_inforce
+    description: >
+      Current-state risk-policy book sliced by company, status, smoker, and
+      income bracket. Use this for book-in-force dashboards, lapse analysis,
+      and premium income summaries. Investment policies are excluded — this
+      is life/disability/chronic/accident cover only.
+    base_table:
+      database: ANALYTICS_DEV
+      schema: MARTS
+      table: RISK_POLICY_INFORCE
+    synonyms: [policy book, risk book, in-force policies, book of business]
+
+    dimensions:
+      - name: company
+        synonyms: [tenant]
+        description: Tenant name.
+        expr: company
+        data_type: VARCHAR
+        sample_values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+
+      - name: policy_status
+        synonyms: [status, policy state]
+        description: Active / Lapsed / Cancelled / Pending / UNKNOWN.
+        expr: policy_status
+        data_type: VARCHAR
+        sample_values: ['Active', 'Lapsed', 'Cancelled', 'Pending', 'UNKNOWN']
+
+      - name: smoker_status
+        synonyms: [smoker flag, tobacco status]
+        description: Smoker indicator from underwriting — may be UNKNOWN if missing.
+        expr: smoker_status
+        data_type: VARCHAR
+
+      - name: income_bracket
+        synonyms: [income band, salary range]
+        description: Income bracket from underwriting.
+        expr: income_bracket
+        data_type: VARCHAR
+
+    measures:
+      - name: policy_count
+        synonyms: [number of policies, book size]
+        description: Count of policies in this slice.
+        expr: policy_count
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: active_policy_count
+        synonyms: [in-force policies, active book]
+        description: Policies with status = 'Active'.
+        expr: active_policy_count
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: lapsed_policy_count
+        synonyms: [lapses, lapsed book]
+        description: Policies with status = 'Lapsed'.
+        expr: lapsed_policy_count
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: active_rate
+        synonyms: [retention rate, active ratio]
+        description: Fraction of policies with status = 'Active'. Pre-computed per slice.
+        expr: active_rate
+        data_type: NUMBER
+
+      - name: lapse_rate
+        synonyms: [lapse ratio, attrition rate]
+        description: Fraction of policies with status = 'Lapsed'. Pre-computed per slice.
+        expr: lapse_rate
+        data_type: NUMBER
+
+      - name: total_monthly_premium_sum
+        synonyms: [monthly premium, monthly income]
+        description: Sum of monthly premiums across this slice in rand.
+        expr: total_monthly_premium_sum
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: annualised_premium
+        synonyms: [annual premium, APE, annualised income, yearly premium]
+        description: Annualised premium income (monthly × 12) in rand.
+        expr: annualised_premium
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: avg_age_next
+        synonyms: [average age, mean age]
+        description: Average age at next birthday.
+        expr: avg_age_next
+        data_type: NUMBER
+        default_aggregation: avg
+
+      - name: total_life_sum_assured
+        synonyms: [sum assured, life cover in force, coverage amount]
+        description: Total life sum assured across policies in this slice, in rand.
+        expr: total_life_sum_assured
+        data_type: NUMBER
+        default_aggregation: sum
+
+# -----------------------------------------------------------------
+# Example questions to ground the model for Cortex Analyst
+# -----------------------------------------------------------------
+verified_queries:
+  - name: top_advisors_by_commission_in_2024
+    question: Who were the top 10 advisors by net commissions in 2024?
+    sql: |
+      select
+        company, advisor_identifier,
+        sum(commission_net_total) as total_net
+      from ANALYTICS_DEV.MARTS.FINANCE_ADVISOR_COMMISSIONS_MONTHLY
+      where year = 2024
+      group by company, advisor_identifier
+      order by total_net desc
+      limit 10
+
+  - name: aum_trend_main_book_2024
+    question: Show monthly AUM trend for Main Book in 2024.
+    sql: |
+      select year_month, sum(aum_amount) as total_aum
+      from ANALYTICS_DEV.MARTS.PORTFOLIO_AUM_MONTHLY
+      where company = 'MAIN_BOOK' and year = 2024
+      group by year_month
+      order by year_month
+
+  - name: lapse_rate_by_tenant
+    question: What is the lapse rate per tenant?
+    sql: |
+      select
+        company,
+        sum(lapsed_policy_count) * 1.0 / nullif(sum(policy_count), 0) as lapse_rate
+      from ANALYTICS_DEV.MARTS.RISK_POLICY_INFORCE
+      group by company
