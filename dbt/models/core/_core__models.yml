@@ -203,3 +203,28 @@ models:
           - not_null:
               config:
                 severity: warn
+
+  - name: dim_client
+    description: >
+      Conformed client dimension. Sourced from valuations and transactions
+      tables (only sources with client_id_number). Covers ~15K unique
+      clients across 3 tenants. PII columns: client_first_name,
+      client_surname, client_initials, client_id_number, birth_date —
+      to be protected with Snowflake dynamic masking policies.
+      birth_date and age_years derived from client_id_number (SA ID
+      format: YYMMDDxxxxxx, century rule 00-29 → 2000s else 1900s).
+    columns:
+      - name: client_sk
+        description: Surrogate key. Hash of (company, client_id_number).
+        data_tests:
+          - not_null
+          - unique
+      - name: client_id_number
+        description: Natural identifier (PII — to be masked).
+        data_tests:
+          - not_null
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
