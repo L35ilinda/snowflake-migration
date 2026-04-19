@@ -114,3 +114,26 @@ models:
           - not_null
           - accepted_values:
               values: ['ETF', 'UNIT_TRUST']
+
+  - name: dim_date
+    description: >
+      Conformed date dimension. Range 2015-01-01 to 2030-12-31.
+      date_sk is YYYYMMDD integer. Fiscal year per South African tax year
+      (starts 1 March).
+    columns:
+      - name: date_day
+        description: Calendar date. Primary natural key.
+        data_tests:
+          - not_null
+          - unique
+      - name: date_sk
+        description: YYYYMMDD integer surrogate key.
+        data_tests:
+          - not_null
+          - unique
+      - name: year
+        data_tests:
+          - not_null
+      - name: fiscal_year
+        data_tests:
+          - not_null
