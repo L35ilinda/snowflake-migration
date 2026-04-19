@@ -25,9 +25,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: dbt/requirements.txt
 
       - name: Install dbt-snowflake
-        run: pip install dbt-snowflake
+        run: pip install -r requirements.txt
 
       - name: Write private key from secret
         run: |
