@@ -65,3 +65,52 @@ models:
       - name: gross_amount
         data_tests:
           - not_null
+
+  - name: dim_product
+    description: >
+      Conformed product dimension. Products span two universes:
+      investment (has product_code, e.g. LA/RA/UT) and insurance
+      (name-only, e.g. Indigo Premier). Natural key per tenant is
+      coalesce(product_code, product_name).
+    columns:
+      - name: product_sk
+        description: Surrogate key. Hash of (company, product_category, natural_key).
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: product_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['INVESTMENT', 'INSURANCE']
+
+  - name: dim_fund
+    description: >
+      Conformed fund dimension. Sourced from valuations only. fund_name is
+      the primary natural key per tenant. fund_code and jse_code are
+      attributes (nullable). fund_type derived: ETF if jse_code present,
+      else UNIT_TRUST.
+    columns:
+      - name: fund_sk
+        description: Surrogate key. Hash of (company, fund_name).
+        data_tests:
+          - not_null
+          - unique
+      - name: fund_name
+        data_tests:
+          - not_null
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: fund_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['ETF', 'UNIT_TRUST']
