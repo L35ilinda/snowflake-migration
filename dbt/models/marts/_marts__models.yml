@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: finance_advisor_commissions_monthly
+    description: >
+      Advisor-level commission performance aggregated monthly. One row per
+      (company, advisor_sk, year_month, commission_category). Includes
+      running total and YoY comparison columns for scorecards.
+    columns:
+      - name: mart_key
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: commission_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['INSURANCE', 'INVESTMENT']
+      - name: advisor_sk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_advisor')
+              field: advisor_sk
+
+  - name: portfolio_aum_monthly
+    description: >
+      Monthly AUM snapshot by fund. One row per (company, fund_sk, year_month).
+      Uses the latest valuation per (policy, fund) within each month.
+      Includes MoM delta and 12-month trailing average.
+    columns:
+      - name: mart_key
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: fund_sk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fund')
+              field: fund_sk
+      - name: aum_amount
+        data_tests:
+          - not_null
+
+  - name: risk_policy_inforce
+    description: >
+      Risk policy book snapshot sliced by status, smoker status, and income
+      bracket. Drives book-in-force dashboards and premium income summaries.
+      INVESTMENT policies are excluded — they have no premium/status concept.
+    columns:
+      - name: mart_key
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: policy_count
+        data_tests:
+          - not_null
