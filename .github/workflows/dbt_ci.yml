@@ -1,11 +1,13 @@
 name: dbt CI
 
+# NOTE: intentionally no `paths` filter. Branch protection lists this
+# workflow as a required status check, and GitHub won't unblock merges
+# if a required check is missing — path-filtered workflows that don't
+# fire count as missing. Running on every PR is the simplest way to
+# guarantee the check exists. Slim CI already keeps runtime low.
 on:
   pull_request:
     branches: [master, main]
-    paths:
-      - 'dbt/**'
-      - '.github/workflows/dbt_ci.yml'
 
 concurrency:
   # One CI run per PR at a time. New pushes cancel in-progress runs.
