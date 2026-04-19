@@ -475,6 +475,22 @@ module "masking_policies" {
   depends_on = [module.database_layers]
 }
 
+# Grant APPLY on each masking policy to FR_ENGINEER so dbt (running as
+# FR_ENGINEER from either LSILINDA or CI_SVC) can attach the policies via
+# post-hook. Without this, `ALTER TABLE ... SET MASKING POLICY ...` fails
+# with "policy does not exist or not authorized".
+resource "snowflake_grant_privileges_to_account_role" "apply_masking_policies" {
+  for_each = module.masking_policies.policy_fully_qualified_names
+
+  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+  privileges        = ["APPLY"]
+
+  on_schema_object {
+    object_type = "MASKING POLICY"
+    object_name = each.value
+  }
+}
+
 # ---- ANALYTICS_CI database (for GitHub Actions dbt builds) ----
 # Dedicated database so CI cannot corrupt dev artifacts. See ADR-0009.
 # Only the database is created here — dbt creates STAGING/CORE/MARTS
