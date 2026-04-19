@@ -1,3 +1,4 @@
+-- CI smoke test: trivial change to trigger dbt_ci.yml end-to-end.
 with source as (
 
     select * from {{ source('raw_main_book', 'main_book_valuations') }}

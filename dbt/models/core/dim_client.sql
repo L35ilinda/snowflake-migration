@@ -1,12 +1,22 @@
+{#
+    Masking policies live in ANALYTICS_DEV.CORE and are applied only when
+    building into ANALYTICS_DEV. The CI target writes to ANALYTICS_CI, a
+    transient sandbox that does not hold its own policies; masking is a
+    property of real environments, not CI. See ADR-0009.
+#}
+{% set apply_masking = target.database == 'ANALYTICS_DEV' %}
+
 {{
     config(
-        post_hook=[
-            "alter table {{ this }} alter column client_id_number set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
-            "alter table {{ this }} alter column client_first_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
-            "alter table {{ this }} alter column client_surname set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
-            "alter table {{ this }} alter column client_full_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
-            "alter table {{ this }} alter column birth_date set masking policy ANALYTICS_DEV.CORE.MP_MASK_DATE_PII"
-        ]
+        post_hook=(
+            [
+                "alter table {{ this }} alter column client_id_number set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+                "alter table {{ this }} alter column client_first_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+                "alter table {{ this }} alter column client_surname set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+                "alter table {{ this }} alter column client_full_name set masking policy ANALYTICS_DEV.CORE.MP_MASK_STRING_PII",
+                "alter table {{ this }} alter column birth_date set masking policy ANALYTICS_DEV.CORE.MP_MASK_DATE_PII",
+            ] if apply_masking else []
+        )
     )
 }}
 
