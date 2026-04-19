@@ -12,6 +12,12 @@ concurrency:
   group: dbt-ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  # Needed by dawidd6/action-download-artifact to look up the latest
+  # successful dbt_main run and pull its prod-manifest artifact.
+  actions: read
+  contents: read
+
 jobs:
   dbt-build:
     name: dbt build against ANALYTICS_CI
