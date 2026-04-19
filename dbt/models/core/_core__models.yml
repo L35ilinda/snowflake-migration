@@ -137,3 +137,69 @@ models:
       - name: fiscal_year
         data_tests:
           - not_null
+
+  - name: fct_valuations
+    description: >
+      Investment portfolio valuations fact. Grain = one row per
+      (company, policy_number, fund_name, valuation_date).
+      FKs: advisor, product (INVESTMENT only), fund, date.
+      Nullable FKs use warn-severity relationship tests since source data
+      has ~15% nulls in advisor_identifier, product, and fund columns.
+    columns:
+      - name: valuation_sk
+        description: Surrogate key. Hash of (company, policy_number, fund_name, valuation_date).
+        data_tests:
+          - not_null
+          - unique
+      - name: advisor_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_advisor')
+              field: advisor_sk
+              config:
+                severity: warn
+                where: "advisor_sk is not null"
+      - name: product_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_product')
+              field: product_sk
+              config:
+                severity: warn
+                where: "product_sk is not null"
+      - name: fund_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_fund')
+              field: fund_sk
+              config:
+                severity: warn
+                where: "fund_sk is not null"
+      - name: date_sk
+        data_tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+              config:
+                severity: warn
+                where: "date_sk is not null"
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: policy_number
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: valuation_date
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: market_value_amount
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
