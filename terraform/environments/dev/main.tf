@@ -268,3 +268,168 @@ module "main_book_pipes" {
     }
   }
 }
+
+# ---- Snowpipe: Indigo Insurance ----
+module "indigo_insurance_pipes" {
+  source = "../../modules/snowflake_snowpipe"
+
+  database_name    = module.database_layers.database_name
+  raw_schema_name  = module.database_layers.raw_schema_names["02"]
+  stage_name       = module.company_ingest["02"].stage_name
+  file_format_name = module.company_ingest["02"].file_format_name
+  environment      = var.environment
+
+  datasets = {
+    indigo_ins_commissions = {
+      file_pattern = ".*indigo_ins_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    indigo_inv_commissions = {
+      file_pattern = ".*indigo_inv_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    # Note: indigo has `ProductName` column that Main Book does not.
+    indigo_insurance = {
+      file_pattern = ".*indigo_insurance.*[.]csv"
+      columns = [
+        "policynumber", "inceptiondate", "policystatus", "memberid",
+        "agenext", "smokerstatus", "incomebrackets", "productname",
+        "life_sumassured", "life_premium", "disability_type",
+        "disability_sumassured", "disability_premium", "chronic_level",
+        "chronic_waitingperiod", "chronic_premium", "accident_benefit",
+        "accident_premium", "total_monthlypremium", "commission_rate",
+        "advisor_identifier", "client_title", "client_first_name",
+        "client_surname", "client_initials"
+      ]
+    }
+
+    indigo_ins_transactions = {
+      file_pattern = ".*indigo_ins_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "member_id", "transaction_type",
+        "transaction_date", "amount", "status", "reference_number",
+        "narrative", "claim_type", "claim_reason", "benefit_affected",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    indigo_transactions = {
+      file_pattern = ".*indigo_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "client_id_number", "fund_code",
+        "transaction_type", "transaction_date", "amount", "units",
+        "price_per_unit", "status", "reference_number", "source_fund",
+        "narrative", "client_title", "client_first_name", "client_surname",
+        "client_initials"
+      ]
+    }
+
+    indigo_valuations = {
+      file_pattern = ".*indigo_valuations.*[.]csv"
+      columns = [
+        "advisor_identifier", "client_title", "client_first_name",
+        "client_surname", "client_initials", "client_id_number",
+        "policy_number", "product_name", "product_code", "fund_name",
+        "fund_code", "jse_code", "valuation_date", "currency",
+        "market_value_amount", "units", "anniversary_month",
+        "monthly_income_amount", "monthly_income_pct", "income_frequency"
+      ]
+    }
+  }
+}
+
+# ---- Snowpipe: Horizon Assurance ----
+module "horizon_assurance_pipes" {
+  source = "../../modules/snowflake_snowpipe"
+
+  database_name    = module.database_layers.database_name
+  raw_schema_name  = module.database_layers.raw_schema_names["03"]
+  stage_name       = module.company_ingest["03"].stage_name
+  file_format_name = module.company_ingest["03"].file_format_name
+  environment      = var.environment
+
+  datasets = {
+    horizon_ins_commissions = {
+      file_pattern = ".*horizon_ins_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    horizon_inv_commissions = {
+      file_pattern = ".*horizon_inv_commissions.*[.]csv"
+      columns = [
+        "commission_id", "policy_number", "advisor_identifier", "business_line",
+        "commission_type", "transaction_date", "gross_amount", "vat_amount",
+        "net_amount", "product_code", "commission_rate", "clawback_reason",
+        "payment_reference", "payment_date", "brokerage_split", "status",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    horizon_assurance = {
+      file_pattern = ".*horizon_assurance.*[.]csv"
+      columns = [
+        "policynumber", "inceptiondate", "policystatus", "memberid",
+        "agenext", "smokerstatus", "incomebrackets", "productname",
+        "life_sumassured", "life_premium", "disability_type",
+        "disability_sumassured", "disability_premium", "chronic_level",
+        "chronic_waitingperiod", "chronic_premium", "accident_benefit",
+        "accident_premium", "total_monthlypremium", "commission_rate",
+        "advisor_identifier", "client_title", "client_first_name",
+        "client_surname", "client_initials"
+      ]
+    }
+
+    horizon_ins_transactions = {
+      file_pattern = ".*horizon_ins_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "member_id", "transaction_type",
+        "transaction_date", "amount", "status", "reference_number",
+        "narrative", "claim_type", "claim_reason", "benefit_affected",
+        "client_title", "client_first_name", "client_surname", "client_initials"
+      ]
+    }
+
+    horizon_transactions = {
+      file_pattern = ".*horizon_transactions.*[.]csv"
+      columns = [
+        "transaction_id", "policy_number", "client_id_number", "fund_code",
+        "transaction_type", "transaction_date", "amount", "units",
+        "price_per_unit", "status", "reference_number", "source_fund",
+        "narrative", "client_title", "client_first_name", "client_surname",
+        "client_initials"
+      ]
+    }
+
+    horizon_valuations = {
+      file_pattern = ".*horizon_valuations.*[.]csv"
+      columns = [
+        "advisor_identifier", "client_title", "client_first_name",
+        "client_surname", "client_initials", "client_id_number",
+        "policy_number", "product_name", "product_code", "fund_name",
+        "fund_code", "jse_code", "valuation_date", "currency",
+        "market_value_amount", "units", "anniversary_month",
+        "monthly_income_amount", "monthly_income_pct", "income_frequency"
+      ]
+    }
+  }
+}

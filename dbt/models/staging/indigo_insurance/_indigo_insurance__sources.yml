@@ -1,0 +1,62 @@
+version: 2
+
+sources:
+  - name: raw_indigo_insurance
+    database: ANALYTICS_DEV
+    schema: RAW_INDIGO_INSURANCE
+    description: Raw landing tables for Indigo Insurance company. All columns VARCHAR, loaded via Snowpipe.
+
+    tables:
+      - name: indigo_ins_commissions
+        description: Insurance commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: indigo_inv_commissions
+        description: Investment commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: indigo_insurance
+        description: Risk/insurance benefit policies (adds ProductName column vs Main Book equivalent).
+        columns:
+          - name: policynumber
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: indigo_ins_transactions
+        description: Transactions against insurance benefit policies.
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: indigo_transactions
+        description: Investment fund transactions (contributions, withdrawals, fees).
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: indigo_valuations
+        description: Investment portfolio valuations per fund per period.
+        columns:
+          - name: policy_number
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn

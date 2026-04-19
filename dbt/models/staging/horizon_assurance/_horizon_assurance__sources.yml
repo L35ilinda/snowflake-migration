@@ -1,0 +1,62 @@
+version: 2
+
+sources:
+  - name: raw_horizon_assurance
+    database: ANALYTICS_DEV
+    schema: RAW_HORIZON_ASSURANCE
+    description: Raw landing tables for Horizon Assurance company. All columns VARCHAR, loaded via Snowpipe.
+
+    tables:
+      - name: horizon_ins_commissions
+        description: Insurance commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: horizon_inv_commissions
+        description: Investment commission records.
+        columns:
+          - name: commission_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: horizon_assurance
+        description: Assurance/risk benefit policies (adds ProductName column vs Main Book equivalent).
+        columns:
+          - name: policynumber
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: horizon_ins_transactions
+        description: Transactions against insurance benefit policies.
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: horizon_transactions
+        description: Investment fund transactions (contributions, withdrawals, fees).
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: horizon_valuations
+        description: Investment portfolio valuations per fund per period.
+        columns:
+          - name: policy_number
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
