@@ -2,11 +2,16 @@
     {#
         Use the custom schema name directly (STAGING, CORE, MARTS) instead of
         dbt's default behaviour of prepending the target schema as a prefix.
-        If no custom schema is set, fall back to the target schema.
+
+        Optionally prefix with `DBT_SCHEMA_PREFIX` env var — CI sets this to
+        `PR_<number>_` to isolate PR builds from each other and from `main`
+        builds. Empty string (default) means "no prefix", which is what local
+        dev and the deploy-to-dev workflow use.
     #}
+    {%- set schema_prefix = env_var('DBT_SCHEMA_PREFIX', '') | upper -%}
     {%- if custom_schema_name is none -%}
-        {{ target.schema }}
+        {{ schema_prefix }}{{ target.schema }}
     {%- else -%}
-        {{ custom_schema_name | trim | upper }}
+        {{ schema_prefix }}{{ custom_schema_name | trim | upper }}
     {%- endif -%}
 {%- endmacro %}
