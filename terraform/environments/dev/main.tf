@@ -563,3 +563,30 @@ resource "snowflake_grant_account_role" "ci_svc_fr_engineer" {
   role_name = module.rbac.functional_role_names["FR_ENGINEER"]
   user_name = snowflake_user.ci_svc.name
 }
+
+# ---- Streamlit + Cortex Analyst over MARTS ----
+# FR_ANALYST users get an NL Q&A app over the three marts via Cortex.
+# Files on the stage (semantic model YAML + Streamlit source) are uploaded
+# out-of-band via scripts/upload_streamlit_app.py after apply.
+module "streamlit_analyst" {
+  source = "../../modules/snowflake_streamlit_analyst"
+
+  database_name = module.database_layers.database_name
+  environment   = var.environment
+
+  grant_usage_to = [
+    module.rbac.functional_role_names["FR_ENGINEER"],
+    module.rbac.functional_role_names["FR_ANALYST"],
+  ]
+  cortex_user_roles = [
+    module.rbac.functional_role_names["FR_ENGINEER"],
+    module.rbac.functional_role_names["FR_ANALYST"],
+    # Streamlit apps run as their owner's role. This app is owned by
+    # ACCOUNTADMIN (the role used to apply Terraform), so ACCOUNTADMIN
+    # itself needs CORTEX_USER to call the Cortex Analyst API from
+    # inside the app.
+    "ACCOUNTADMIN",
+  ]
+
+  depends_on = [module.database_layers, module.warehouses]
+}
