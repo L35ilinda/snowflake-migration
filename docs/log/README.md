@@ -2,6 +2,10 @@
 
 Chronological record of work done on this project. Narrative complement to the ADRs in [../adr/](../adr/) and the state summary in [../../CLAUDE.md](../../CLAUDE.md) §4.
 
+## Start here if you are replicating the project
+
+[**issues-and-fixes.md**](issues-and-fixes.md) — de-duplicated catalogue of every non-trivial blocker we hit, with root cause, fix, and replication tip. If you are rebuilding from zero, read that first. The daily files below are chronology; the issues file is the lookup table.
+
 ## How this log is structured
 
 - **One file per working day**, named `YYYY-MM-DD.md` (SAST timezone).

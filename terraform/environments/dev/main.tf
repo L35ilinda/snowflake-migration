@@ -590,3 +590,17 @@ module "streamlit_analyst" {
 
   depends_on = [module.database_layers, module.warehouses]
 }
+
+# Streamlit apps in Snowflake run as their owner role. This app is owned by
+# ACCOUNTADMIN (whoever ran `terraform apply`), and Snowflake does not
+# currently support ALTER STREAMLIT ... SET EXECUTE_AS = 'CALLER'. So for
+# ACCOUNTADMIN to actually execute the embedded SQL against MARTS, it needs
+# the read access role directly — inherited access via DB ownership or
+# secondary roles isn't sufficient for the Streamlit runtime context.
+resource "snowflake_execute" "accountadmin_marts_ro" {
+  execute = "GRANT ROLE ${module.rbac.access_role_names["marts_ro"]} TO ROLE ACCOUNTADMIN"
+  revert  = "REVOKE ROLE ${module.rbac.access_role_names["marts_ro"]} FROM ROLE ACCOUNTADMIN"
+  query   = "SHOW GRANTS OF ROLE ${module.rbac.access_role_names["marts_ro"]}"
+
+  depends_on = [module.rbac]
+}
