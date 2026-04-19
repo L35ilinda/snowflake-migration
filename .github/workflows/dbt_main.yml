@@ -1,0 +1,87 @@
+name: dbt deploy to ANALYTICS_DEV
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'dbt/**'
+      - '.github/workflows/dbt_main.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: dbt-main-deploy
+  cancel-in-progress: false
+
+jobs:
+  dbt-build-dev:
+    name: dbt build against ANALYTICS_DEV
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: dbt
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: dbt/requirements.txt
+
+      - name: Install dbt-snowflake
+        run: pip install -r requirements.txt
+
+      - name: Write private key from secret
+        run: |
+          mkdir -p ~/.snowflake
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" | base64 --decode > ~/.snowflake/ci_svc_rsa_key.p8
+          chmod 600 ~/.snowflake/ci_svc_rsa_key.p8
+
+      - name: Write profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<EOF
+          snowflake_migration:
+            target: deploy
+            outputs:
+              deploy:
+                type: snowflake
+                account: "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+                user: "${{ secrets.SNOWFLAKE_USER }}"
+                role: "${{ secrets.SNOWFLAKE_ROLE }}"
+                warehouse: "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
+                database: ANALYTICS_DEV
+                schema: STAGING
+                authenticator: snowflake_jwt
+                private_key_path: /home/runner/.snowflake/ci_svc_rsa_key.p8
+                threads: 4
+          EOF
+
+      - name: dbt deps
+        run: dbt deps --target deploy
+
+      - name: dbt debug
+        run: dbt debug --target deploy
+
+      - name: dbt build
+        run: dbt build --target deploy --fail-fast
+
+      - name: Upload manifest (for slim CI baseline)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-manifest
+          path: dbt/target/manifest.json
+          retention-days: 14
+
+      - name: Upload full target directory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-target-main
+          path: dbt/target/
+          retention-days: 7

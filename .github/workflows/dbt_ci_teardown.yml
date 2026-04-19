@@ -1,0 +1,87 @@
+name: dbt CI teardown
+
+# Drop the per-PR schemas created in ANALYTICS_CI when a PR closes
+# (merged or not). See ADR-0009.
+
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - 'dbt/**'
+      - '.github/workflows/dbt_ci.yml'
+      - '.github/workflows/dbt_ci_teardown.yml'
+
+jobs:
+  teardown:
+    name: Drop PR_${{ github.event.pull_request.number }}_* schemas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install snowflake connector
+        run: pip install snowflake-connector-python cryptography
+
+      - name: Write private key from secret
+        run: |
+          mkdir -p ~/.snowflake
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" | base64 --decode > ~/.snowflake/ci_svc_rsa_key.p8
+          chmod 600 ~/.snowflake/ci_svc_rsa_key.p8
+
+      - name: Drop PR schemas
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from cryptography.hazmat.primitives import serialization
+          import snowflake.connector
+
+          key = serialization.load_pem_private_key(
+              Path('/home/runner/.snowflake/ci_svc_rsa_key.p8').read_bytes(),
+              password=None,
+          )
+          pkey_der = key.private_bytes(
+              encoding=serialization.Encoding.DER,
+              format=serialization.PrivateFormat.PKCS8,
+              encryption_algorithm=serialization.NoEncryption(),
+          )
+
+          conn = snowflake.connector.connect(
+              account=os.environ['SNOWFLAKE_ACCOUNT'],
+              user=os.environ['SNOWFLAKE_USER'],
+              private_key=pkey_der,
+              role=os.environ['SNOWFLAKE_ROLE'],
+              warehouse=os.environ['SNOWFLAKE_WAREHOUSE'],
+              database=os.environ['SNOWFLAKE_DATABASE'],
+          )
+          cur = conn.cursor()
+          pr = os.environ['PR_NUMBER']
+          prefix = f"PR_{pr}_"
+
+          cur.execute(
+              "select schema_name from information_schema.schemata "
+              f"where schema_name like '{prefix}%' "
+              "and catalog_name = current_database()"
+          )
+          schemas = [r[0] for r in cur.fetchall()]
+          if not schemas:
+              print(f"No schemas matching {prefix}* — nothing to drop")
+          for s in schemas:
+              print(f"Dropping {s}")
+              cur.execute(f'drop schema if exists "{s}" cascade')
+          conn.close()
+          PY

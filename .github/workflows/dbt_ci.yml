@@ -7,6 +7,11 @@ on:
       - 'dbt/**'
       - '.github/workflows/dbt_ci.yml'
 
+concurrency:
+  # One CI run per PR at a time. New pushes cancel in-progress runs.
+  group: dbt-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   dbt-build:
     name: dbt build against ANALYTICS_CI
@@ -15,6 +20,12 @@ jobs:
     defaults:
       run:
         working-directory: dbt
+
+    env:
+      # Each PR gets its own schema prefix so concurrent PRs never collide.
+      # generate_schema_name.sql reads this env var and prepends it to every
+      # schema name (STAGING, CORE, MARTS, etc.).
+      DBT_SCHEMA_PREFIX: "PR_${{ github.event.pull_request.number }}_"
 
     steps:
       - name: Checkout
@@ -39,7 +50,7 @@ jobs:
       - name: Write profiles.yml
         run: |
           mkdir -p ~/.dbt
-          cat > ~/.dbt/profiles.yml <<'EOF'
+          cat > ~/.dbt/profiles.yml <<EOF
           snowflake_migration:
             target: ci
             outputs:
@@ -59,16 +70,47 @@ jobs:
       - name: dbt deps
         run: dbt deps --target ci
 
+      # --- Slim CI: download latest prod manifest from main branch ---
+      # Uses dawidd6/action-download-artifact to reach across workflows.
+      # If no baseline exists yet (first-ever CI run), selection falls back
+      # to a full build. See "Slim CI" section of ADR-0009.
+      - name: Download prod manifest (for slim CI)
+        id: prod_manifest
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: dbt_main.yml
+          workflow_conclusion: success
+          branch: master
+          name: prod-manifest
+          path: prod_manifest/
+
+      - name: Compute dbt selector
+        id: selector
+        run: |
+          if [ -f prod_manifest/manifest.json ]; then
+            echo "Baseline manifest found — using slim CI"
+            echo "select_flag=--select state:modified+" >> $GITHUB_OUTPUT
+            echo "defer_flag=--defer --state prod_manifest" >> $GITHUB_OUTPUT
+          else
+            echo "No baseline manifest — full build"
+            echo "select_flag=" >> $GITHUB_OUTPUT
+            echo "defer_flag=" >> $GITHUB_OUTPUT
+          fi
+
       - name: dbt debug
         run: dbt debug --target ci
 
       - name: dbt build
-        run: dbt build --target ci --fail-fast
+        run: |
+          dbt build --target ci --fail-fast \
+            ${{ steps.selector.outputs.select_flag }} \
+            ${{ steps.selector.outputs.defer_flag }}
 
       - name: Upload run artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dbt-target
+          name: dbt-target-pr-${{ github.event.pull_request.number }}
           path: dbt/target/
           retention-days: 7
