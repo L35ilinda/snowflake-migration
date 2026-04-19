@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: dim_advisor
+    description: >
+      Conformed advisor dimension. One row per (company, advisor_identifier).
+      advisor_sk is a hash of (company, advisor_identifier); advisor IDs are
+      not globally unique across companies, so same ID in different companies
+      is modelled as separate advisors.
+    columns:
+      - name: advisor_sk
+        description: Surrogate key. Hash of (company, advisor_identifier).
+        data_tests:
+          - not_null
+          - unique
+      - name: advisor_identifier
+        description: Source advisor ID (e.g. ADV0180, MBK0397).
+        data_tests:
+          - not_null
+      - name: company
+        description: Source tenant.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+
+  - name: fct_commissions
+    description: >
+      Conformed commissions fact. Grain = one row per commission payout.
+      Union of ins_commissions and inv_commissions from all three tenants.
+      commission_category distinguishes INSURANCE vs INVESTMENT source.
+    columns:
+      - name: commission_sk
+        description: Surrogate key. Hash of (company, commission_id).
+        data_tests:
+          - not_null
+          - unique
+      - name: advisor_sk
+        description: FK to dim_advisor.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - relationships:
+              to: ref('dim_advisor')
+              field: advisor_sk
+              config:
+                severity: warn
+      - name: commission_id
+        data_tests:
+          - not_null
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: commission_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['INSURANCE', 'INVESTMENT']
+      - name: transaction_date
+        data_tests:
+          - not_null
+      - name: gross_amount
+        data_tests:
+          - not_null
