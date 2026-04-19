@@ -1,15 +1,15 @@
 locals {
   companies = {
     "01" = {
-      company_name = "MAIN_BOOK"
+      company_name   = "MAIN_BOOK"
       container_name = var.azure_storage_container_main_book
     }
     "02" = {
-      company_name = "INDIGO_INSURANCE"
+      company_name   = "INDIGO_INSURANCE"
       container_name = var.azure_storage_container_indigo_insurance
     }
     "03" = {
-      company_name = "HORIZON_ASSURANCE"
+      company_name   = "HORIZON_ASSURANCE"
       container_name = var.azure_storage_container_horizon_assurance
     }
   }
@@ -137,9 +137,9 @@ module "warehouses" {
       grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
     }
     BI_WH = {
-      size           = "XSMALL"
-      auto_suspend   = 60
-      comment        = "BI and ad-hoc queries."
+      size         = "XSMALL"
+      auto_suspend = 60
+      comment      = "BI and ad-hoc queries."
       grant_usage_to = [
         module.rbac.functional_role_names["FR_ENGINEER"],
         module.rbac.functional_role_names["FR_ANALYST"],
@@ -188,17 +188,36 @@ module "warehouses" {
   }
 }
 
+# ---- Snowpipe auto-ingest (Event Grid → Storage Queue → Snowflake) ----
+# Shared notification integration used by every pipe across all companies.
+# See ADR-0010.
+module "snowpipe_notifications" {
+  source = "../../modules/snowpipe_azure_notifications"
+
+  name                           = upper("ni_azure_fspsftpsource_${var.environment}")
+  storage_account_name           = var.azure_storage_account_name
+  storage_account_resource_group = var.azure_resource_group_name
+  azure_tenant_id                = var.azure_tenant_id
+
+  # Only CSVs from our fsp-* containers should trigger Snowpipe.
+  subject_prefix = "/blobServices/default/containers/fsp-"
+  subject_suffix = ".csv"
+
+  environment = var.environment
+}
+
 # ---- Snowpipe: Main Book ----
 # Landing tables (all-VARCHAR) + pipes for each Main Book dataset.
 # Pipes use ON_ERROR=CONTINUE and MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE.
 module "main_book_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["01"]
-  stage_name       = module.company_ingest["01"].stage_name
-  file_format_name = module.company_ingest["01"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["01"]
+  stage_name                    = module.company_ingest["01"].stage_name
+  file_format_name              = module.company_ingest["01"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     main_book_ins_commissions = {
@@ -275,11 +294,12 @@ module "main_book_pipes" {
 module "indigo_insurance_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["02"]
-  stage_name       = module.company_ingest["02"].stage_name
-  file_format_name = module.company_ingest["02"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["02"]
+  stage_name                    = module.company_ingest["02"].stage_name
+  file_format_name              = module.company_ingest["02"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     indigo_ins_commissions = {
@@ -358,11 +378,12 @@ module "indigo_insurance_pipes" {
 module "horizon_assurance_pipes" {
   source = "../../modules/snowflake_snowpipe"
 
-  database_name    = module.database_layers.database_name
-  raw_schema_name  = module.database_layers.raw_schema_names["03"]
-  stage_name       = module.company_ingest["03"].stage_name
-  file_format_name = module.company_ingest["03"].file_format_name
-  environment      = var.environment
+  database_name                 = module.database_layers.database_name
+  raw_schema_name               = module.database_layers.raw_schema_names["03"]
+  stage_name                    = module.company_ingest["03"].stage_name
+  file_format_name              = module.company_ingest["03"].file_format_name
+  notification_integration_name = module.snowpipe_notifications.name
+  environment                   = var.environment
 
   datasets = {
     horizon_ins_commissions = {
@@ -456,7 +477,7 @@ module "masking_policies" {
           else '***MASKED***'
         end
       SQL
-      comment = "Redact string PII (names, IDs) for non-privileged roles."
+      comment     = "Redact string PII (names, IDs) for non-privileged roles."
     }
 
     MP_MASK_DATE_PII = {
@@ -468,7 +489,7 @@ module "masking_policies" {
           else date_trunc('year', val)
         end
       SQL
-      comment = "Truncate date PII (birth_date) to year for non-privileged roles."
+      comment     = "Truncate date PII (birth_date) to year for non-privileged roles."
     }
   }
 
@@ -526,11 +547,11 @@ resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_c
 # Dedicated service user for GitHub Actions. Uses its own key pair for
 # rotation/audit separation from developer users. See ADR-0009.
 resource "snowflake_user" "ci_svc" {
-  name          = "CI_SVC"
-  login_name    = "CI_SVC"
-  display_name  = "CI service account (GitHub Actions)"
-  comment       = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
-  disabled      = "false"
+  name         = "CI_SVC"
+  login_name   = "CI_SVC"
+  display_name = "CI service account (GitHub Actions)"
+  comment      = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
+  disabled     = "false"
 
   default_role      = module.rbac.functional_role_names["FR_ENGINEER"]
   default_warehouse = module.warehouses.warehouse_names["TRANSFORM_WH"]

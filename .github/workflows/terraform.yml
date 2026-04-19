@@ -1,16 +1,54 @@
-﻿name: Terraform
+name: Terraform
+
+# Lints Terraform on every PR touching terraform/**. Runs `terraform
+# fmt -check` (style) and `terraform validate` (syntax + module wiring)
+# inside each module and the dev environment. Does NOT run `terraform
+# plan` — that needs Azure + Snowflake credentials and is better done
+# from a local workstation where drift can be reviewed properly.
+
 on:
   pull_request:
-    paths: ["terraform/**"]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
   push:
-    branches: [main]
-    paths: ["terraform/**"]
+    branches: [master, main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+
+permissions:
+  contents: read
 
 jobs:
-  plan:
+  validate:
+    name: fmt + validate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir=terraform/environments/dev init
-      - run: terraform -chdir=terraform/environments/dev plan
+        with:
+          terraform_version: '1.14.8'
+
+      - name: terraform fmt -check -recursive
+        run: terraform fmt -check -recursive terraform/
+
+      # Validate each module standalone, then the dev environment.
+      # `terraform init -backend=false` skips the Azure backend so we
+      # don't need credentials for syntax checking.
+      - name: Validate modules
+        run: |
+          set -e
+          for module in terraform/modules/*/; do
+            echo "::group::Validating $module"
+            terraform -chdir="$module" init -backend=false -input=false
+            terraform -chdir="$module" validate
+            echo "::endgroup::"
+          done
+
+      - name: Validate environments/dev
+        run: |
+          terraform -chdir=terraform/environments/dev init -backend=false -input=false
+          terraform -chdir=terraform/environments/dev validate

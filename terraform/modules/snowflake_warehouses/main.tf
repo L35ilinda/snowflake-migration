@@ -72,7 +72,7 @@ resource "snowflake_resource_monitor" "this" {
   frequency       = each.value.frequency
   start_timestamp = each.value.start_timestamp
 
-  notify_triggers            = each.value.notify_triggers
-  suspend_trigger            = each.value.suspend_trigger
-  suspend_immediate_trigger  = each.value.suspend_immediate_trigger
+  notify_triggers           = each.value.notify_triggers
+  suspend_trigger           = each.value.suspend_trigger
+  suspend_immediate_trigger = each.value.suspend_immediate_trigger
 }

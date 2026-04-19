@@ -60,7 +60,10 @@ resource "snowflake_pipe" "this" {
     ON_ERROR = CONTINUE
   SQL
 
-  auto_ingest = false
+  # When a notification integration is supplied, AUTO_INGEST fires the pipe
+  # on every blob-created event. Otherwise the pipe stays manual-refresh.
+  auto_ingest = var.notification_integration_name != null
+  integration = var.notification_integration_name
 
   comment = "Snowpipe for ${each.key} from ${var.stage_name} (${var.environment})."
 }
