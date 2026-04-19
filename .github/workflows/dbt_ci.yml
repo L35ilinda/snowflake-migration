@@ -12,6 +12,12 @@ concurrency:
   group: dbt-ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  # Needed by dawidd6/action-download-artifact to look up the latest
+  # successful dbt_main run and pull its prod-manifest artifact.
+  actions: read
+  contents: read
+
 jobs:
   dbt-build:
     name: dbt build against ANALYTICS_CI
@@ -83,7 +89,9 @@ jobs:
           workflow_conclusion: success
           branch: master
           name: prod-manifest
-          path: prod_manifest/
+          # Path is relative to the repo root; dbt subsequent steps have
+          # working-directory=dbt, so the file needs to land under dbt/.
+          path: dbt/prod_manifest/
 
       - name: Compute dbt selector
         id: selector

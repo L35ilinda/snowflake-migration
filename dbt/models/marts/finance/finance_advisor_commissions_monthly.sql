@@ -1,3 +1,4 @@
+-- Slim CI verification: isolated change to this one mart.
 {#
     Advisor commission performance, aggregated monthly.
 
