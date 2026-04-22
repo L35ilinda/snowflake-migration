@@ -390,3 +390,36 @@ models:
           - not_null
           - accepted_values:
               values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+
+  - name: dim_policy_history
+    description: >
+      Type 2 history view over snp_dim_policy. Parallel to dim_policy
+      (Type 1, current state — what facts join to). Anyone needing
+      point-in-time policy attributes queries this view. valid_from /
+      valid_to / is_current projected from dbt's snapshot bookkeeping.
+      See ADR-0015.
+    columns:
+      - name: policy_version_id
+        description: dbt-generated SCD identifier (dbt_scd_id). Unique per (policy_sk, version).
+        data_tests:
+          - not_null
+          - unique
+      - name: policy_sk
+        description: Surrogate key. Hash of (company, policy_number). Same value as dim_policy.policy_sk.
+        data_tests:
+          - not_null
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: is_current
+        description: True for the row representing each policy's current state. Exactly one per policy_sk.
+        data_tests:
+          - not_null
+      - name: valid_from
+        data_tests:
+          - not_null
+      - name: valid_to
+        data_tests:
+          - not_null
