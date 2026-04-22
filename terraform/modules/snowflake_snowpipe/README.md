@@ -5,9 +5,10 @@ Creates all-VARCHAR landing tables and Snowpipe definitions for a company's data
 ## Design
 
 - **Landing tables** have all business columns as `VARCHAR`. dbt handles type casting in staging.
-- **Metadata columns** added automatically: `_LOADED_AT`, `_SOURCE_FILE`, `_SOURCE_ROW`.
-- **Pipes** use `ON_ERROR = CONTINUE` (never fail the pipe) and `MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE` (handles PascalCase headers like risk_benefits).
-- **Auto-ingest** is off by default. Use `ALTER PIPE ... REFRESH` to trigger manually, or enable auto-ingest with Azure Event Grid later.
+- **Metadata column** added automatically: `_LOADED_AT TIMESTAMP_NTZ`. Populated by the pipe via `CURRENT_TIMESTAMP()` in a transformed COPY (column DEFAULTs do not fire on `COPY INTO`).
+- **Pipes** use `ON_ERROR = CONTINUE` (never fail the pipe) and a positional transformed COPY (`SELECT $1, $2, ..., $N, CURRENT_TIMESTAMP()`). `MATCH_BY_COLUMN_NAME` is not used because it conflicts with `SKIP_HEADER` on the file format — column order in the `datasets` map must match CSV column order.
+- **Auto-ingest** is enabled when `notification_integration_name` is set (passed from `snowpipe_azure_notifications`). Without it, pipes stay manual-refresh only.
+- **Rejected rows** are silently dropped by `ON_ERROR = CONTINUE`; the `snowflake_quarantine` module captures them via `VALIDATE_PIPE_LOAD()`. See ADR-0012.
 
 ## Usage
 

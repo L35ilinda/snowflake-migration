@@ -184,7 +184,13 @@ Resources we needed to enable, in order:
 ### `CURRENT_TIMESTAMP()` default on `_LOADED_AT` does NOT fire on `COPY INTO`
 - **Symptom:** Landing-table column `_LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()` stays NULL after Snowpipe loads rows.
 - **Root cause:** Column defaults fire on explicit `INSERT`, not on `COPY INTO`.
-- **Current state:** Documented as a known limitation in ADR-0010. Proper fix is to explicitly select `CURRENT_TIMESTAMP()` as a value in the pipe's COPY statement, or drop `_LOADED_AT` from landing tables entirely.
+- **Fix (2026-04-21):** Switch the pipe COPY to a transformed form that
+  enumerates columns and selects `CURRENT_TIMESTAMP()` for `_LOADED_AT`:
+  `COPY INTO tbl(col1, ..., colN, _LOADED_AT) FROM (SELECT $1, ..., $N, CURRENT_TIMESTAMP() FROM @stage)`.
+  Templated in [`snowflake_snowpipe/main.tf`](../../terraform/modules/snowflake_snowpipe/main.tf)
+  via `for i in range(length(columns))`. Forces pipe replacement (ForceNew on
+  `copy_statement`); landing tables unchanged. Pre-fix rows backfilled via
+  one-shot script.
 
 ### `MATCH_BY_COLUMN_NAME` conflicts with `SKIP_HEADER`
 - **Symptom:** Pipe `COPY INTO` with both `MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE` and a file format using `SKIP_HEADER = 1` fails.
@@ -363,9 +369,13 @@ Resources we needed to enable, in order:
 
 ## Things we kept as known limitations (not fixed)
 
-- `_LOADED_AT` NULL on COPY INTO (ADR-0010).
+- ~~`_LOADED_AT` NULL on COPY INTO (ADR-0010).~~ Fixed 2026-04-21 — see above.
 - No dead-letter queue for Event Grid delivery failures.
-- No Snowflake alerting on pipe errors; `SYSTEM$PIPE_STATUS` polled manually.
+- ~~No Snowflake alerting on pipe errors~~ — replaced 2026-04-21 by quarantine
+  capture (ADR-0012). Active alerting on `pipe_errors` row-count delta is still
+  outstanding.
 - Shared CI schemas in `ANALYTICS_CI` (not per-PR). Fine at team size ≤ 5.
+- Quarantine MERGE key collapses two errors on the same `(pipe, file, row, line)`
+  to one row. Edge case; revisit if Snowflake ever emits multi-error rows.
 - Semantic model kept in sync with marts manually.
 - Cortex Analyst availability in `AZURE_EASTUS`.
