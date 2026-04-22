@@ -4,7 +4,11 @@ The legacy-parity serving surface — Power BI semantic model + one paginated
 report, both on Snowflake MARTS. Replaces the SSAS Tabular + SSRS pieces
 of the old stack. See [ADR-0017](../docs/adr/0017-power-bi-serving.md)
 for the design choices (DirectQuery for the model; Import for the
-paginated report; key-pair `PBI_SVC` for publish).
+paginated report).
+
+> **Scope note (2026-04-22):** publish to Power BI Service is **skipped**.
+> The `.pbix` and `.rdl` ship in this repo + screenshots; that's the
+> portfolio artifact. See ADR-0017 addendum.
 
 ## What lives here
 
@@ -13,7 +17,6 @@ paginated report; key-pair `PBI_SVC` for publish).
 | [walkthrough/01_connect.md](walkthrough/01_connect.md) | Power BI Desktop → Snowflake (OAuth, build phase) |
 | [walkthrough/02_semantic_model.md](walkthrough/02_semantic_model.md) | Tables, relationships, measures, hierarchies |
 | [walkthrough/03_paginated_report.md](walkthrough/03_paginated_report.md) | Power BI Report Builder — monthly advisor commission statement |
-| [walkthrough/04_publish.md](walkthrough/04_publish.md) | Switch to `PBI_SVC` service identity for publish |
 | `screenshots/` | Empty until the GUI work happens; populate as you go |
 | `fsp_marts.pbix` | Semantic model (binary, committed once built) |
 | `fsp_advisor_commissions.rdl` | Paginated report definition (XML, diff-able) |
@@ -25,11 +28,10 @@ paginated report; key-pair `PBI_SVC` for publish).
 | `BI_WH` (XSMALL, 60s auto-suspend) | Compute for both Power BI surfaces |
 | `RM_BI_WH` (2 credits/month) | FinOps cap — will trip under stress; that's the demo |
 | `FR_ANALYST` role | Read-only on STAGING/CORE/MARTS; USAGE on `BI_WH` |
-| `LSILINDA` user | Holds `FR_ANALYST` — used during build phase via OAuth |
-| `PBI_SVC` user (key-pair) | Service identity for the published model. Default role `FR_ANALYST`, default warehouse `BI_WH`. Public key registered via Terraform; private key at `C:/Users/Lonwabo_Eric/.snowflake/keys/pbi_svc_rsa_key.p8` |
+| `LSILINDA` user | Holds `FR_ANALYST` — used via OAuth as the only Power BI connection identity |
 
-No Snowflake changes are needed during the build phase — `LSILINDA` already
-has everything required. `PBI_SVC` only matters at publish time.
+No service user — publish was scoped out, so OAuth as `LSILINDA` is the
+single identity for both `.pbix` build and `.rdl` build.
 
 ## Semantic model design (target)
 
@@ -90,8 +92,7 @@ near-zero credits.
 
 ## Status
 
-- [x] Snowflake side (Terraform): `PBI_SVC` user + `FR_ANALYST` grant
-  applied 2026-04-22.
+- [x] Snowflake side: nothing to provision — `LSILINDA` + `FR_ANALYST` + `BI_WH` already in place from foundations.
 - [x] Walkthrough docs written.
 - [ ] Build the .pbix — Power BI Desktop, follow `walkthrough/`.
 - [ ] Build the .rdl — Power BI Report Builder, follow `walkthrough/03`.

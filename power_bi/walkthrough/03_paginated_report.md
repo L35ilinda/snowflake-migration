@@ -126,6 +126,9 @@ revisions.
   matches and that you're picking a month that actually has data
   (`select distinct commission_month from analytics_dev.marts.finance_advisor_commissions_monthly`).
 
-## Next
+## Done
 
-[04 — Publish with PBI_SVC service identity](04_publish.md).
+When the `.pbix`, the `.rdl`, and the screenshots are committed, that's
+`v0.3.0-serve` ready to tag. Publish to Power BI Service is intentionally
+skipped (ADR-0017 addendum) — the artifacts in this repo are the
+portfolio deliverable.

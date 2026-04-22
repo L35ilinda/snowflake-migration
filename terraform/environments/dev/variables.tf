@@ -43,12 +43,5 @@ variable "airbyte_svc_public_key_path" {
   description = "Absolute path to the AIRBYTE_SVC public key file (PEM, no PEM headers). Must live outside the repo."
 }
 
-# ---- Power BI service user ----
-# Public key for the PBI_SVC user (used by published Power BI semantic model
-# / paginated reports as the connection identity). Configure the matching
-# private key in the Power BI Service connection's "Snowflake key-pair
-# authentication" credentials. See ADR-0017.
-variable "pbi_svc_public_key_path" {
-  type        = string
-  description = "Absolute path to the PBI_SVC public key file (PEM, no PEM headers). Must live outside the repo."
-}
+# PBI_SVC variable removed 2026-04-22 — Power BI publish step scoped out
+# per ADR-0017 addendum.

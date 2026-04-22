@@ -181,7 +181,7 @@ resource monitors, Airflow
 - [x] **Type 2 `dim_policy` via dbt snapshot** (ADR-0015) — `snp_dim_policy` (check strategy on a curated attribute set) + `dim_policy_history` view exposing `valid_from` / `valid_to` / `is_current`. Existing `dim_policy.sql` (Type 1) untouched so facts continue joining to current state.
 - [x] **Data Vault 2.0 on transactions** (ADR-0015) — 4 hubs (transaction, policy, client, fund) + 3 links (txn-policy, txn-client, txn-fund) + 2 satellites split by churn rate (`sat_transaction_details`, `sat_transaction_amounts`). All `incremental` insert-only with hashdiff guard on sats; coexists with the star schema. Source = `fct_transactions`. `dbt build` PASS=72 WARN=0 ERROR=0. Tagged `v0.2.0-model-the-warehouse` (PRs #9 + #11; PR #10 auto-closed by stacked-base deletion — see ADR-0016).
 - [x] **Stacked-PR merge convention documented** (ADR-0016) — retarget downstream PR base to `master` *before* deleting the upstream branch. Cross-referenced in [issues-and-fixes.md](docs/log/issues-and-fixes.md) under "GitHub workflow."
-- [x] **Power BI v0.3.0 scaffold** (ADR-0017) — Snowflake side: `PBI_SVC` user (key-pair, default role `FR_ANALYST`, default warehouse `BI_WH`) provisioned via Terraform. Repo scaffold under [power_bi/](power_bi/): README + 4-step walkthrough (connect / semantic model / paginated report / publish). DirectQuery for the semantic model, Import for the paginated report. .pbix and .rdl pending GUI build.
+- [x] **Power BI v0.3.0 scaffold** (ADR-0017 + 2026-04-22 addendum) — repo scaffold under [power_bi/](power_bi/): README + 3-step walkthrough (connect / semantic model / paginated report). DirectQuery for the semantic model, Import for the paginated report. **Publish to Power BI Service scoped out** — `.pbix` + `.rdl` + screenshots in repo are the portfolio deliverable. `PBI_SVC` Snowflake user destroyed; `LSILINDA` OAuth is the only Power BI connection identity. .pbix and .rdl pending GUI build.
 
 ### Pending (Model the warehouse — tag v0.2.0)
 - [x] `dbt snapshot` for `dim_policy` + `dim_policy_history` view (ADR-0015)
@@ -189,9 +189,9 @@ resource monitors, Airflow
 - [ ] Tag `v0.2.0-model-the-warehouse`
 
 ### Pending (Serve — v0.3.0)
-- [x] ADR-0017 (Power BI on Snowflake — semantic model location, connection mode, auth)
-- [x] Snowflake side: `PBI_SVC` user (key-pair, `FR_ANALYST`) via Terraform
-- [x] Repo scaffold: [power_bi/](power_bi/) with README + 4 walkthroughs
+- [x] ADR-0017 (Power BI on Snowflake — semantic model location, connection mode, auth) + 2026-04-22 addendum (publish skipped)
+- [x] Snowflake side: nothing to provision — `LSILINDA` + `FR_ANALYST` + `BI_WH` already in place. `PBI_SVC` provisioned then destroyed when publish was scoped out.
+- [x] Repo scaffold: [power_bi/](power_bi/) with README + 3 walkthroughs (connect / semantic model / paginated report)
 - [ ] Build `fsp_marts.pbix` (Power BI Desktop, DirectQuery) — GUI work, follow walkthroughs
 - [ ] Build `fsp_advisor_commissions.rdl` (Power BI Report Builder, Import) — GUI work
 - [ ] Capture screenshots into `power_bi/screenshots/`
@@ -232,7 +232,7 @@ Per ADR-0014 — deferred to keep the v1.0 path focused on higher-impact work.
 - **SEMANTIC schema:** internal stage `MODELS` (Cortex semantic model YAML + Streamlit source); Streamlit app `FSP_ANALYST`
 - **Warehouses:** `COMPUTE_WH` (default, XS, 300s), `LOAD_WH` (XS, 60s), `TRANSFORM_WH` (XS, 60s), `BI_WH` (XS, 60s)
 - **Resource monitors:** `RM_DEV_ACCOUNT` (10cr backstop), `RM_LOAD_WH` (5cr), `RM_TRANSFORM_WH` (3cr), `RM_BI_WH` (2cr)
-- **Roles:** `FR_ENGINEER` (all RW incl. `RAW_QUARANTINE`, `RAW_OPS`), `FR_ANALYST` (staging/core/marts RO + `RAW_QUARANTINE` RO for data-quality visibility), `FR_AIRBYTE` (`RAW_OPS` RW only — Airbyte destination), 16 access roles (`AR_ANALYTICS_DEV_<SCHEMA>_RW/RO`), `CI_SVC` service user with `FR_ENGINEER`, `AIRBYTE_SVC` service user with `FR_AIRBYTE`, `PBI_SVC` service user with `FR_ANALYST` (Power BI publish identity, key-pair auth). `ACCOUNTADMIN` holds `AR_ANALYTICS_DEV_MARTS_RO` so the Streamlit app (owner = ACCOUNTADMIN) can query MARTS. `SNOWFLAKE.CORTEX_USER` granted to FR_ENGINEER, FR_ANALYST, ACCOUNTADMIN.
+- **Roles:** `FR_ENGINEER` (all RW incl. `RAW_QUARANTINE`, `RAW_OPS`), `FR_ANALYST` (staging/core/marts RO + `RAW_QUARANTINE` RO for data-quality visibility), `FR_AIRBYTE` (`RAW_OPS` RW only — Airbyte destination), 16 access roles (`AR_ANALYTICS_DEV_<SCHEMA>_RW/RO`), `CI_SVC` service user with `FR_ENGINEER`, `AIRBYTE_SVC` service user with `FR_AIRBYTE`. `ACCOUNTADMIN` holds `AR_ANALYTICS_DEV_MARTS_RO` so the Streamlit app (owner = ACCOUNTADMIN) can query MARTS. `SNOWFLAKE.CORTEX_USER` granted to FR_ENGINEER, FR_ANALYST, ACCOUNTADMIN.
 - **Storage integration:** `SI_AZURE_FSPSFTPSOURCE_DEV` (covers `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`)
 - **Notification integration:** `NI_AZURE_FSPSFTPSOURCE_DEV` wired to Event Grid → Storage Queue `snowpipe-events` for auto-ingest (ADR-0010)
 - **Stages:** `STG_MAIN_BOOK`, `STG_INDIGO_INSURANCE`, `STG_HORIZON_ASSURANCE` (external, per-tenant); `SEMANTIC.MODELS` (internal)
@@ -241,7 +241,7 @@ Per ADR-0014 — deferred to keep the v1.0 path focused on higher-impact work.
 - **File formats:** `FF_CSV_MAIN_BOOK`, `FF_CSV_INDIGO_INSURANCE`, `FF_CSV_HORIZON_ASSURANCE`
 - **Masking policies:** `MP_MASK_STRING_PII`, `MP_MASK_DATE_PII` in `CORE`; applied to `dim_client` via dbt post-hook when `target.database == 'ANALYTICS_DEV'`
 - **Account parameters:** `ENABLE_CORTEX_ANALYST = TRUE` (set; blocked by region per ADR-0011)
-- **Terraform-managed state:** storage integration, 2 databases, 9 schemas, 3 external stages + 1 internal stage, 3 file formats, 19 tables (18 landing + 1 quarantine), 18 pipes, 1 task, 19 roles, 3 warehouses, 4 resource monitors, 4 Azure containers, 1 Azure storage queue, 1 Event Grid system topic + subscription, 1 Snowflake notification integration, 2 masking policies, 1 Streamlit app, `CI_SVC` + `AIRBYTE_SVC` + `PBI_SVC` users
+- **Terraform-managed state:** storage integration, 2 databases, 9 schemas, 3 external stages + 1 internal stage, 3 file formats, 19 tables (18 landing + 1 quarantine), 18 pipes, 1 task, 19 roles, 3 warehouses, 4 resource monitors, 4 Azure containers, 1 Azure storage queue, 1 Event Grid system topic + subscription, 1 Snowflake notification integration, 2 masking policies, 1 Streamlit app, `CI_SVC` + `AIRBYTE_SVC` users
 
 ### Source data shape
 - **Total files:** ~80 CSVs across all containers + onboarding queue
@@ -380,7 +380,7 @@ Scope-locked to 3 tenants for the entire v0.x → v1.0.0 arc. See ADR-0014.
    Star Schema (6 dims + 4 facts + 3 MARTS), Type 2 `dim_policy_history` via dbt snapshot, and full Data Vault 2.0 transactions domain (4 hubs + 3 links + 2 sats with hashdiff guards) all live in CORE. ADR-0015. `dbt build` PASS=72 WARN=0 ERROR=0. Tag pushed at merge commit `f5d9d40`.
 
 4. **Serve — `v0.3.0-serve` (in progress)**
-   Streamlit in Snowflake live with domain dashboards. Power BI scaffold complete: ADR-0017 + `PBI_SVC` user (Terraform-applied) + repo walkthroughs in [power_bi/](power_bi/). Outstanding: GUI build of `fsp_marts.pbix` (DirectQuery) + `fsp_advisor_commissions.rdl` (Import) + screenshots + tag.
+   Streamlit in Snowflake live with domain dashboards. Power BI scaffold complete: ADR-0017 (with publish-skip addendum) + repo walkthroughs in [power_bi/](power_bi/). Publish to Power BI Service explicitly skipped — `.pbix` + `.rdl` + screenshots in repo are the deliverable. Outstanding: GUI build of `fsp_marts.pbix` (DirectQuery) + `fsp_advisor_commissions.rdl` (Import) + screenshots + tag.
 
 5. **Govern — `v0.4.0-govern`**
    Masking policies on `dim_client` PII live; resource monitors live; quarantine task live. Outstanding: row access policies for multi-tenant isolation; tighter `FR_CI` role; Snowflake Alert on quarantine row-count delta; Event Grid DLQ.

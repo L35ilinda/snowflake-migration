@@ -1,8 +1,25 @@
 # ADR-0017: Power BI on Snowflake — semantic model location, connection mode, and auth
 
-- **Status:** accepted
+- **Status:** accepted; **publish step (§3 publish phase) skipped — see 2026-04-22 addendum**
 - **Date:** 2026-04-22
 - **Deciders:** Eric Silinda
+
+> **2026-04-22 addendum — publish skipped.** The `.pbix` and `.rdl`
+> ship in the repo + screenshots only; nothing is published to a
+> Power BI Service workspace. Consequences:
+>
+> - **`PBI_SVC` Snowflake user destroyed.** It existed solely as the
+>   service identity for the published-model connection; with publish
+>   skipped, it has no purpose. Removed from Terraform; private/public
+>   keys at `C:/Users/Lonwabo_Eric/.snowflake/keys/pbi_svc_rsa_key.{p8,pub}`
+>   left on disk for the user to delete manually if desired.
+> - **Build phase still uses OAuth as `LSILINDA`** — unchanged.
+> - **`walkthrough/04_publish.md` deleted** (dead instructions).
+> - **Reversal:** if publish becomes necessary later, the §3 publish-phase
+>   decisions in this ADR remain canonical — re-add `PBI_SVC` (or adopt
+>   the Microsoft Entra reversal trigger) at that point.
+> - The §1 (semantic model in Power BI) and §2 (DirectQuery + Import)
+>   decisions are unaffected.
 
 ## Context
 
