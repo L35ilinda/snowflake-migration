@@ -52,9 +52,21 @@ resource "snowflake_pipe" "this" {
   schema   = var.raw_schema_name
   name     = upper("pipe_${each.key}")
 
+  # Transformed COPY: enumerate the source columns positionally ($1..$N) and
+  # append CURRENT_TIMESTAMP() so _LOADED_AT is populated on every load.
+  # Column DEFAULTs do not fire on COPY INTO — only on explicit INSERT — so
+  # the simpler "COPY INTO tbl FROM @stage" form leaves _LOADED_AT NULL.
   copy_statement = <<-SQL
-    COPY INTO "${var.database_name}"."${var.raw_schema_name}"."${upper(each.key)}"
-    FROM @"${var.database_name}"."${var.raw_schema_name}"."${var.stage_name}"
+    COPY INTO "${var.database_name}"."${var.raw_schema_name}"."${upper(each.key)}" (
+      ${join(", ", [for c in each.value.columns : "\"${upper(c)}\""])},
+      "_LOADED_AT"
+    )
+    FROM (
+      SELECT
+        ${join(", ", [for i in range(length(each.value.columns)) : format("$%d", i + 1)])},
+        CURRENT_TIMESTAMP()
+      FROM @"${var.database_name}"."${var.raw_schema_name}"."${var.stage_name}"
+    )
     FILE_FORMAT = (FORMAT_NAME = "${var.database_name}"."${var.raw_schema_name}"."${var.file_format_name}")
     PATTERN = '${each.value.file_pattern}'
     ON_ERROR = CONTINUE

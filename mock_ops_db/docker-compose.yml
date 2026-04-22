@@ -1,0 +1,34 @@
+# Mock operational database for the "replicate sources" phase. Stands in for
+# the legacy SQL Server operational systems being replaced. Airbyte
+# (self-hosted, configured separately) replicates from this Postgres
+# instance into ANALYTICS_DEV.RAW_OPS in Snowflake. See ADR-0013.
+#
+# Pinned to Postgres 16 because Airbyte's source-postgres connector
+# version we plan to use supports 16; bumping later is fine but should be
+# a deliberate change, not a docker-compose drift surprise.
+
+services:
+  postgres:
+    image: postgres:16.4
+    container_name: mock_ops_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ops}
+      POSTGRES_USER: ${POSTGRES_USER:-ops_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - mock_ops_pgdata:/var/lib/postgresql/data
+      # Initialization scripts run once on first container start, in
+      # filename order. 01_schema then 02_seed.
+      - ./seed:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ops_admin} -d ${POSTGRES_DB:-ops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mock_ops_pgdata:
+    name: mock_ops_pgdata

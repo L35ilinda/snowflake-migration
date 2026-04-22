@@ -33,3 +33,12 @@ variable "ci_svc_public_key_path" {
   type        = string
   description = "Absolute path to the CI_SVC public key file (PEM, no PEM headers). Must live outside the repo."
 }
+
+# ---- Airbyte service user ----
+# Public key for the AIRBYTE_SVC user (used by self-hosted Airbyte to write
+# into RAW_OPS). Configure the matching private key as the destination
+# credential in the Airbyte UI. See ADR-0013.
+variable "airbyte_svc_public_key_path" {
+  type        = string
+  description = "Absolute path to the AIRBYTE_SVC public key file (PEM, no PEM headers). Must live outside the repo."
+}

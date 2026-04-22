@@ -89,9 +89,11 @@ module "rbac" {
   schemas = merge(
     { for cid, name in module.database_layers.raw_schema_names : lower(name) => name },
     {
-      staging = module.database_layers.staging_schema_name
-      core    = module.database_layers.core_schema_name
-      marts   = module.database_layers.marts_schema_name
+      staging        = module.database_layers.staging_schema_name
+      core           = module.database_layers.core_schema_name
+      marts          = module.database_layers.marts_schema_name
+      raw_quarantine = snowflake_schema.raw_quarantine.name
+      raw_ops        = snowflake_schema.raw_ops.name
     }
   )
 
@@ -100,20 +102,30 @@ module "rbac" {
       comment = "Full read-write access for data engineers."
       access_role_grants = concat(
         [for cid, name in module.database_layers.raw_schema_names : "${lower(name)}_rw"],
-        ["staging_rw", "core_rw", "marts_rw"]
+        ["staging_rw", "core_rw", "marts_rw", "raw_quarantine_rw", "raw_ops_rw"]
       )
     }
     FR_ANALYST = {
-      comment            = "Read-only access for analysts."
-      access_role_grants = ["staging_ro", "core_ro", "marts_ro"]
+      comment = "Read-only access for analysts."
+      # Analysts see quarantine errors (data-quality visibility) but not raw
+      # per-tenant landing tables (tenant data is conformed in STAGING first).
+      access_role_grants = ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro"]
+    }
+    FR_AIRBYTE = {
+      comment            = "Self-hosted Airbyte destination role. Writes replicated operational tables into RAW_OPS. See ADR-0013."
+      access_role_grants = ["raw_ops_rw"]
     }
   }
 
   user_grants = {
     # LSILINDA holds both functional roles so we can test analyst-facing
     # artefacts (e.g. dim_client masking policies) without a second user.
+    # Service users (CI_SVC, AIRBYTE_SVC) are granted outside this module
+    # because they are created alongside dev/main.tf, not inside snowflake_rbac.
     LSILINDA = ["FR_ENGINEER", "FR_ANALYST"]
   }
+
+  depends_on = [snowflake_schema.raw_quarantine, snowflake_schema.raw_ops]
 }
 
 # ---- Warehouses + resource monitors ----
@@ -603,4 +615,81 @@ resource "snowflake_execute" "accountadmin_marts_ro" {
   query   = "SHOW GRANTS OF ROLE ${module.rbac.access_role_names["marts_ro"]}"
 
   depends_on = [module.rbac]
+}
+
+# ---- Cross-tenant schemas (RAW_QUARANTINE, RAW_OPS) ----
+# These do not belong in the database_layers module because they cross
+# tenant boundaries (quarantine spans all pipes; ops is replicated from
+# the mock operational DB, not a tenant SFTP feed).
+resource "snowflake_schema" "raw_quarantine" {
+  database = module.database_layers.database_name
+  name     = "RAW_QUARANTINE"
+  comment  = "Snowpipe rejected-row capture across all tenants. See ADR-0012."
+}
+
+resource "snowflake_schema" "raw_ops" {
+  database = module.database_layers.database_name
+  name     = "RAW_OPS"
+  comment  = "Landing zone for tables replicated from the mock operational DB via Airbyte. See ADR-0013."
+}
+
+# ---- Snowpipe quarantine ----
+# One shared table + one task that captures rejected rows across every pipe
+# in the project via VALIDATE_PIPE_LOAD. See ADR-0012.
+module "quarantine" {
+  source = "../../modules/snowflake_quarantine"
+
+  database_name  = module.database_layers.database_name
+  schema_name    = snowflake_schema.raw_quarantine.name
+  warehouse_name = module.warehouses.warehouse_names["LOAD_WH"]
+  environment    = var.environment
+
+  # Every pipe in the project. Append here when new pipes are added.
+  pipe_fully_qualified_names = concat(
+    [for k, name in module.main_book_pipes.pipe_names :
+      "${module.database_layers.database_name}.${module.database_layers.raw_schema_names["01"]}.${name}"
+    ],
+    [for k, name in module.indigo_insurance_pipes.pipe_names :
+      "${module.database_layers.database_name}.${module.database_layers.raw_schema_names["02"]}.${name}"
+    ],
+    [for k, name in module.horizon_assurance_pipes.pipe_names :
+      "${module.database_layers.database_name}.${module.database_layers.raw_schema_names["03"]}.${name}"
+    ],
+  )
+
+  depends_on = [module.rbac, module.warehouses]
+}
+
+# ---- AIRBYTE_SVC service user ----
+# Self-hosted Airbyte writes replicated operational tables into RAW_OPS.
+# Key-pair auth, separate key from LSILINDA and CI_SVC per ADR-0009 / ADR-0013.
+resource "snowflake_user" "airbyte_svc" {
+  name         = "AIRBYTE_SVC"
+  login_name   = "AIRBYTE_SVC"
+  display_name = "Airbyte service account (self-hosted)"
+  comment      = "Runs Airbyte syncs from the mock operational DB into RAW_OPS. See ADR-0013."
+  disabled     = "false"
+
+  default_role      = "FR_AIRBYTE"
+  default_warehouse = module.warehouses.warehouse_names["LOAD_WH"]
+
+  rsa_public_key = file(var.airbyte_svc_public_key_path)
+}
+
+resource "snowflake_grant_account_role" "airbyte_svc_fr_airbyte" {
+  role_name = module.rbac.functional_role_names["FR_AIRBYTE"]
+  user_name = snowflake_user.airbyte_svc.name
+}
+
+# Airbyte's Snowflake destination connector also needs USAGE on the
+# warehouse it runs against. FR_AIRBYTE inherits USAGE on the database
+# via raw_ops_rw, but warehouse access is granted at the warehouses module.
+resource "snowflake_grant_privileges_to_account_role" "fr_airbyte_load_wh_usage" {
+  account_role_name = module.rbac.functional_role_names["FR_AIRBYTE"]
+  privileges        = ["USAGE"]
+
+  on_account_object {
+    object_type = "WAREHOUSE"
+    object_name = module.warehouses.warehouse_names["LOAD_WH"]
+  }
 }
