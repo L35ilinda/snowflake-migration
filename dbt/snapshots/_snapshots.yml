@@ -1,0 +1,22 @@
+version: 2
+
+snapshots:
+  - name: snp_dim_policy
+    description: >
+      Type 2 snapshot of dim_policy (current-state). Strategy `check` on a
+      curated attribute set so trivial column shuffles don't manufacture
+      history rows. See ADR-0015.
+    columns:
+      - name: policy_sk
+        data_tests:
+          - not_null
+      - name: dbt_scd_id
+        data_tests:
+          - not_null
+          - unique
+      - name: dbt_valid_from
+        data_tests:
+          - not_null
+      - name: dbt_updated_at
+        data_tests:
+          - not_null

@@ -1,0 +1,201 @@
+version: 2
+
+models:
+  # ---------------------------------------------------------------------
+  # Hubs — one row per business key. Insert-only.
+  # ---------------------------------------------------------------------
+
+  - name: hub_transaction
+    description: >
+      Hub on (company, transaction_id). Source: fct_transactions per
+      ADR-0015. Excludes rows where transaction_id is null.
+    columns:
+      - name: transaction_hk
+        description: Hash of (company, transaction_id). Same formula as fct_transactions.transaction_sk less the disambiguator.
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: transaction_id
+        data_tests:
+          - not_null
+      - name: load_dts
+        data_tests:
+          - not_null
+      - name: record_source
+        data_tests:
+          - not_null
+
+  - name: hub_policy
+    description: >
+      Hub on (company, policy_number). Sourced from fct_transactions, so
+      this is the universe of transaction-touched policies — narrower
+      than dim_policy which includes investment policies referenced only
+      via valuations.
+    columns:
+      - name: policy_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['MAIN_BOOK', 'INDIGO_INSURANCE', 'HORIZON_ASSURANCE']
+      - name: policy_number
+        data_tests:
+          - not_null
+
+  - name: hub_client
+    description: >
+      Hub on (company, client_id_number). Investment transactions only.
+    columns:
+      - name: client_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+      - name: client_id_number
+        data_tests:
+          - not_null
+
+  - name: hub_fund
+    description: >
+      Hub on (company, fund_code). Investment transactions only.
+    columns:
+      - name: fund_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: company
+        data_tests:
+          - not_null
+      - name: fund_code
+        data_tests:
+          - not_null
+
+  # ---------------------------------------------------------------------
+  # Links — one row per business-key combination. Insert-only.
+  # ---------------------------------------------------------------------
+
+  - name: lnk_transaction_policy
+    description: >
+      Link between hub_transaction and hub_policy. ~92% of fct_transactions
+      participate (those with both transaction_id and policy_number).
+    columns:
+      - name: transaction_policy_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: transaction_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_transaction')
+              field: transaction_hk
+      - name: policy_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_policy')
+              field: policy_hk
+
+  - name: lnk_transaction_client
+    description: Link between hub_transaction and hub_client (investment only).
+    columns:
+      - name: transaction_client_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: transaction_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_transaction')
+              field: transaction_hk
+      - name: client_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_client')
+              field: client_hk
+
+  - name: lnk_transaction_fund
+    description: Link between hub_transaction and hub_fund (investment only).
+    columns:
+      - name: transaction_fund_hk
+        data_tests:
+          - not_null
+          - unique
+      - name: transaction_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_transaction')
+              field: transaction_hk
+      - name: fund_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_fund')
+              field: fund_hk
+
+  # ---------------------------------------------------------------------
+  # Satellites — versioned attributes via hashdiff guard. Append-only.
+  # ---------------------------------------------------------------------
+
+  - name: sat_transaction_details
+    description: >
+      Descriptive transaction attributes (low churn) — type, date, status,
+      narrative, claim metadata, category. Versioned via hashdiff over the
+      attribute payload; new row inserted only when payload changes.
+    columns:
+      - name: transaction_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_transaction')
+              field: transaction_hk
+      - name: load_dts
+        data_tests:
+          - not_null
+      - name: hashdiff
+        data_tests:
+          - not_null
+    data_tests:
+      # Composite uniqueness: one version per (hub, load_dts).
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - transaction_hk
+            - load_dts
+
+  - name: sat_transaction_amounts
+    description: >
+      Financial measures (higher churn) — amount, units, price_per_unit.
+      Split from sat_transaction_details so a restated amount doesn't
+      re-version unrelated descriptive metadata. Same hashdiff-guarded
+      append pattern.
+    columns:
+      - name: transaction_hk
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('hub_transaction')
+              field: transaction_hk
+      - name: load_dts
+        data_tests:
+          - not_null
+      - name: hashdiff
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - transaction_hk
+            - load_dts

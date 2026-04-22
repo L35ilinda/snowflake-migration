@@ -8,6 +8,7 @@ model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
 seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
 
 target-path: "target"
 clean-targets:
@@ -24,6 +25,15 @@ models:
     core:
       +materialized: table
       +schema: core
+      vault:
+        # Insert-only Vault discipline. unique_key per model.
+        +materialized: incremental
+        +schema: core
     marts:
       +materialized: table
       +schema: marts
+
+snapshots:
+  snowflake_migration:
+    +target_schema: "{{ (env_var('DBT_SCHEMA_PREFIX', '') ~ 'CORE') | upper }}"
+    +target_database: "{{ target.database }}"
