@@ -693,3 +693,28 @@ resource "snowflake_grant_privileges_to_account_role" "fr_airbyte_load_wh_usage"
     object_name = module.warehouses.warehouse_names["LOAD_WH"]
   }
 }
+
+# ---- PBI_SVC service user ----
+# Power BI Service uses this as the connection identity for the published
+# semantic model + paginated reports. Key-pair auth, separate key from
+# LSILINDA / CI_SVC / AIRBYTE_SVC per the existing separation-of-identity
+# pattern (ADR-0009 / ADR-0013 / ADR-0017). FR_ANALYST role only — read-only
+# on STAGING/CORE/MARTS via the rbac module's existing grants. BI_WH USAGE
+# already covered by the warehouses module.
+resource "snowflake_user" "pbi_svc" {
+  name         = "PBI_SVC"
+  login_name   = "PBI_SVC"
+  display_name = "Power BI service account (published semantic model + paginated reports)"
+  comment      = "Used by published Power BI artifacts to query MARTS via DirectQuery / scheduled Import. See ADR-0017."
+  disabled     = "false"
+
+  default_role      = "FR_ANALYST"
+  default_warehouse = module.warehouses.warehouse_names["BI_WH"]
+
+  rsa_public_key = file(var.pbi_svc_public_key_path)
+}
+
+resource "snowflake_grant_account_role" "pbi_svc_fr_analyst" {
+  role_name = module.rbac.functional_role_names["FR_ANALYST"]
+  user_name = snowflake_user.pbi_svc.name
+}

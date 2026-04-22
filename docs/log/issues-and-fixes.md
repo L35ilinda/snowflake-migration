@@ -41,6 +41,7 @@ Bootstrap order matters — later steps depend on earlier ones working. Deviatin
 - [dbt setup and behaviour](#dbt-setup-and-behaviour)
 - [Data quality patterns](#data-quality-patterns)
 - [GitHub Actions CI](#github-actions-ci)
+- [GitHub workflow](#github-workflow)
 - [Streamlit in Snowflake](#streamlit-in-snowflake)
 - [Cortex Analyst regional block](#cortex-analyst-regional-block)
 
@@ -305,6 +306,20 @@ Resources we needed to enable, in order:
 ### Resource monitor `frequency` requires `start_timestamp`
 - **Symptom:** `"frequency": all of `frequency,start_timestamp` must be specified`.
 - **Fix:** Always pair the two in the module variable.
+
+---
+
+## GitHub workflow
+
+### Stacked PR auto-closes when its base branch is deleted
+- **Symptom:** `gh pr merge <upstream> --merge --delete-branch` succeeds; the dependent stacked PR moves to `state = CLOSED` with `mergeStateStatus = DIRTY`. Reopening fails with `Cannot change the base branch of a closed pull request`.
+- **Root cause:** GitHub closes a PR when its base ref ceases to exist. It does **not** auto-retarget to the default branch.
+- **Fix sequence (canonical, see ADR-0016):**
+  1. `gh pr merge <upstream> --merge` — merge but **don't** delete the branch yet.
+  2. `gh pr edit <downstream> --base master` — retarget while the base ref still exists.
+  3. `git push origin --delete <upstream-branch>` — now safe.
+  4. `gh pr checks <downstream> --watch && gh pr merge <downstream> --merge --delete-branch`.
+- **Replication tip:** if you've already hit this, the closed PR is unrecoverable — open a fresh PR from the same head branch targeting `master`. Reference the closed PR in the body so the link survives in history.
 
 ---
 
