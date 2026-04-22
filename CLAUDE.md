@@ -183,10 +183,10 @@ resource monitors, Airflow
 - [x] **Stacked-PR merge convention documented** (ADR-0016) — retarget downstream PR base to `master` *before* deleting the upstream branch. Cross-referenced in [issues-and-fixes.md](docs/log/issues-and-fixes.md) under "GitHub workflow."
 - [x] **Power BI v0.3.0 scaffold** (ADR-0017 + 2026-04-22 addendum) — repo scaffold under [power_bi/](power_bi/): README + 3-step walkthrough (connect / semantic model / paginated report). DirectQuery for the semantic model, Import for the paginated report. **Publish to Power BI Service scoped out** — `.pbix` + `.rdl` + screenshots in repo are the portfolio deliverable. `PBI_SVC` Snowflake user destroyed; `LSILINDA` OAuth is the only Power BI connection identity. .pbix and .rdl pending GUI build.
 
-### Pending (Model the warehouse — tag v0.2.0)
+### Done (Model the warehouse — `v0.2.0-model-the-warehouse` TAGGED 2026-04-22)
 - [x] `dbt snapshot` for `dim_policy` + `dim_policy_history` view (ADR-0015)
 - [x] Build Data Vault 2.0 on transactions (4 hubs + 3 links + 2 sats) (ADR-0015)
-- [ ] Tag `v0.2.0-model-the-warehouse`
+- [x] Tag `v0.2.0-model-the-warehouse` at merge commit `f5d9d40`
 
 ### Pending (Serve — v0.3.0)
 - [x] ADR-0017 (Power BI on Snowflake — semantic model location, connection mode, auth) + 2026-04-22 addendum (publish skipped)
