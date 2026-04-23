@@ -4,6 +4,12 @@ Chronological record of work done on this project. Narrative complement to the
 ADRs in [../adr/](../adr/) and the state summary in
 [../../CLAUDE.md](../../CLAUDE.md) §4.
 
+> **Protocol governing this directory:** [../SESSION_PROTOCOL.md](../SESSION_PROTOCOL.md).
+> The protocol is **non-negotiable** and the canonical reference for
+> when / what / how to capture a session. The template below is a
+> reproducible artifact of the protocol; the protocol is the
+> source of truth.
+
 ## Start here if you are replicating the project
 
 [**issues-and-fixes.md**](issues-and-fixes.md) — de-duplicated catalogue of
