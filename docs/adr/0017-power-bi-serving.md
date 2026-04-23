@@ -1,10 +1,20 @@
 # ADR-0017: Power BI on Snowflake — semantic model location, connection mode, and auth
 
-- **Status:** accepted; **publish step (§3 publish phase) skipped — see 2026-04-22 addendum**
+- **Status:** accepted; **publish step skipped + GUI build deferred — see 2026-04-22 addenda**
 - **Date:** 2026-04-22
 - **Deciders:** Eric Silinda
 
-> **2026-04-22 addendum — publish skipped.** The `.pbix` and `.rdl`
+> **2026-04-22 addendum #2 — GUI build deferred to post-v1.0** (see
+> [ADR-0018](0018-defer-power-bi-gui-build.md)). The `.pbix` and `.rdl`
+> GUI builds and screenshots move to a parked bullet. `v0.3.0-serve` is
+> declared done at design+scaffold scope (no separate git tag — same
+> convention as Replicate Sources at 3-tenant scope per ADR-0014).
+> Streamlit-in-Snowflake remains the live serving surface; ADR-0017
+> §1 + §2 design decisions stay canonical for whenever the GUI work
+> resumes. Walkthroughs in [power_bi/walkthrough/](../../power_bi/walkthrough/)
+> are the canonical instructions for that future work.
+
+> **2026-04-22 addendum #1 — publish skipped.** The `.pbix` and `.rdl`
 > ship in the repo + screenshots only; nothing is published to a
 > Power BI Service workspace. Consequences:
 >
