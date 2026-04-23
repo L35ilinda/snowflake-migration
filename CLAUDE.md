@@ -181,21 +181,19 @@ resource monitors, Airflow
 - [x] **Type 2 `dim_policy` via dbt snapshot** (ADR-0015) — `snp_dim_policy` (check strategy on a curated attribute set) + `dim_policy_history` view exposing `valid_from` / `valid_to` / `is_current`. Existing `dim_policy.sql` (Type 1) untouched so facts continue joining to current state.
 - [x] **Data Vault 2.0 on transactions** (ADR-0015) — 4 hubs (transaction, policy, client, fund) + 3 links (txn-policy, txn-client, txn-fund) + 2 satellites split by churn rate (`sat_transaction_details`, `sat_transaction_amounts`). All `incremental` insert-only with hashdiff guard on sats; coexists with the star schema. Source = `fct_transactions`. `dbt build` PASS=72 WARN=0 ERROR=0. Tagged `v0.2.0-model-the-warehouse` (PRs #9 + #11; PR #10 auto-closed by stacked-base deletion — see ADR-0016).
 - [x] **Stacked-PR merge convention documented** (ADR-0016) — retarget downstream PR base to `master` *before* deleting the upstream branch. Cross-referenced in [issues-and-fixes.md](docs/log/issues-and-fixes.md) under "GitHub workflow."
-- [x] **Power BI v0.3.0 scaffold** (ADR-0017 + 2026-04-22 addendum) — repo scaffold under [power_bi/](power_bi/): README + 3-step walkthrough (connect / semantic model / paginated report). DirectQuery for the semantic model, Import for the paginated report. **Publish to Power BI Service scoped out** — `.pbix` + `.rdl` + screenshots in repo are the portfolio deliverable. `PBI_SVC` Snowflake user destroyed; `LSILINDA` OAuth is the only Power BI connection identity. .pbix and .rdl pending GUI build.
+- [x] **Power BI v0.3.0 scaffold** (ADR-0017 + two 2026-04-22 addenda; ADR-0018) — repo scaffold under [power_bi/](power_bi/): README + 3-step walkthrough (connect / semantic model / paginated report). DirectQuery for the semantic model, Import for the paginated report. **Publish to Power BI Service scoped out** (PR #13 destroyed `PBI_SVC`); `LSILINDA` OAuth is the only Power BI connection identity. **GUI build (`.pbix` + `.rdl` + screenshots) also deferred to post-v1.0 per ADR-0018** — design + walkthroughs + Streamlit-in-Snowflake serving are the v1.0 evidence. Walkthroughs remain the canonical instructions for the future GUI work.
+- [x] **`v0.3.0-serve` declared done at design+scaffold scope** (ADR-0018) — no separate git tag, same convention as Replicate Sources at 3-tenant scope (ADR-0014). Phase 4 status reflects the scope cut.
 
 ### Done (Model the warehouse — `v0.2.0-model-the-warehouse` TAGGED 2026-04-22)
 - [x] `dbt snapshot` for `dim_policy` + `dim_policy_history` view (ADR-0015)
 - [x] Build Data Vault 2.0 on transactions (4 hubs + 3 links + 2 sats) (ADR-0015)
 - [x] Tag `v0.2.0-model-the-warehouse` at merge commit `f5d9d40`
 
-### Pending (Serve — v0.3.0)
-- [x] ADR-0017 (Power BI on Snowflake — semantic model location, connection mode, auth) + 2026-04-22 addendum (publish skipped)
+### Done (Serve — declared done at design+scaffold scope per ADR-0018, no separate tag)
+- [x] ADR-0017 (Power BI on Snowflake — semantic model location, connection mode, auth) + two 2026-04-22 addenda (publish skipped; GUI build deferred per ADR-0018)
 - [x] Snowflake side: nothing to provision — `LSILINDA` + `FR_ANALYST` + `BI_WH` already in place. `PBI_SVC` provisioned then destroyed when publish was scoped out.
 - [x] Repo scaffold: [power_bi/](power_bi/) with README + 3 walkthroughs (connect / semantic model / paginated report)
-- [ ] Build `fsp_marts.pbix` (Power BI Desktop, DirectQuery) — GUI work, follow walkthroughs
-- [ ] Build `fsp_advisor_commissions.rdl` (Power BI Report Builder, Import) — GUI work
-- [ ] Capture screenshots into `power_bi/screenshots/`
-- [ ] Tag `v0.3.0-serve`
+- [x] Streamlit-in-Snowflake remains the live serving surface (4 tabs over MARTS, Cortex Analyst scaffold per ADR-0011)
 
 ### Pending (Govern — v0.4.0)
 - [ ] Row access policies for multi-tenant isolation on CORE/MARTS
@@ -215,9 +213,10 @@ resource monitors, Airflow
 - [ ] Tag `v1.0.0`
 
 ### Parked (post-v1.0.0)
-Per ADR-0014 — deferred to keep the v1.0 path focused on higher-impact work.
-- [ ] **v1.1.0 Replicate operational DB:** Azure Postgres Flexible Server + Flyway V1 + Airbyte sync + dbt staging on `RAW_OPS`. Snowflake-side scaffolding (`RAW_OPS` schema, `AIRBYTE_SVC` user, `FR_AIRBYTE` role) is already provisioned and idle. ADRs 0013 + 0014 cover context.
-- [ ] **8 queue tenants (baobab, fynbos, karoo, khoisan, protea, springbok, summit, ubuntu):** parked for **manual practice** — user wants to onboard these by hand (Snowpipe + dbt) as a learning exercise. Files stay in `fsp-data-onboarding-queue/Outbound/`. New pipe FQNs added by that practice must be appended to `module.quarantine.pipe_fully_qualified_names`.
+Per ADRs 0014 / 0018 — deferred to keep the v1.0 path focused on higher-impact work (govern + orchestrate + writeup).
+- [ ] **Power BI GUI build** (ADR-0018): build `fsp_marts.pbix` (Power BI Desktop, DirectQuery) + `fsp_advisor_commissions.rdl` (Power BI Report Builder, Import) + capture screenshots into `power_bi/screenshots/`. Walkthroughs in [power_bi/walkthrough/](power_bi/walkthrough/) are the canonical instructions.
+- [ ] **v1.1.0 Replicate operational DB** (ADR-0014): Azure Postgres Flexible Server + Flyway V1 + Airbyte sync + dbt staging on `RAW_OPS`. Snowflake-side scaffolding (`RAW_OPS` schema, `AIRBYTE_SVC` user, `FR_AIRBYTE` role) is already provisioned and idle. ADRs 0013 + 0014 cover context.
+- [ ] **8 queue tenants** (baobab, fynbos, karoo, khoisan, protea, springbok, summit, ubuntu): parked for **manual practice** — user wants to onboard these by hand (Snowpipe + dbt) as a learning exercise. Files stay in `fsp-data-onboarding-queue/Outbound/`. New pipe FQNs added by that practice must be appended to `module.quarantine.pipe_fully_qualified_names`.
 - [ ] **15 shared/reference files:** placement decision (shared `RAW_SHARED` vs per-tenant duplication) deferred until manual practice surfaces a concrete need.
 
 ### Snowflake current state
@@ -297,29 +296,29 @@ Per ADR-0014 — deferred to keep the v1.0 path focused on higher-impact work.
 
 ## 6. Next milestone
 
-**Model the warehouse — tag `v0.2.0`.** Replicate Sources is declared done at 3-tenant scope (ADR-0014). The remaining warehouse-modeling work is the next vertical.
+**Govern — tag `v0.4.0`.** v0.2.0 (Model the warehouse) shipped 2026-04-22 (`f5d9d40`). v0.3.0 (Serve) is declared done at design+scaffold scope per ADR-0018 — Streamlit serving live + Power BI design + walkthroughs in repo, GUI build deferred to post-v1.0. The remaining v1.0 path is govern → orchestrate+AI → writeup.
 
 ```text
-Existing CORE Star Schema (6 dims + 4 facts, 1.8M rows from 3 tenants)
+Existing CORE / MARTS (3 tenants, masking on dim_client, monitors + caps live)
    |
    v
-+ dbt snapshot on dim_policy   (Type 1 -> true Type 2 with valid_from/valid_to)
-+ Data Vault 2.0 on transactions  (hubs / links / sats alongside existing star)
++ Snowflake Alert on RAW_QUARANTINE.PIPE_ERRORS row-count delta  (closes ADR-0012 loop)
++ Event Grid DLQ for delivery failures                           (closes ADR-0010 loop)
++ FR_CI role tightened (scoped down from FR_ENGINEER)            (closes ADR-0009 follow-up)
++ Row access policies for multi-tenant isolation on CORE / MARTS (biggest item)
 ```
 
-Concrete steps for the next session:
-1. Convert `dim_policy` from Type 1 to Type 2 via `dbt snapshot`. Existing `is_current` / `valid_from` / `valid_to` columns are already in the model — wiring them to a snapshot table is the missing piece.
-2. Pick the Data Vault 2.0 domain. Default: **transactions** (most history complexity, cleanest fit for the Vault pattern). Confirm before building.
-3. Build `hub_*`, `lnk_*`, `sat_*` models in CORE for the chosen domain. Materialize as tables. Run alongside the existing star schema — no replacement, both coexist for the portfolio narrative.
-4. Add dbt tests for the Vault models (uniqueness on hub keys, referential integrity on links).
-5. Tag `v0.2.0-model-the-warehouse`.
+Concrete steps for the next session (recommended cheapest-first order):
+1. **Snowflake Alert on quarantine row-count delta.** New `snowflake_alert` resource on `RAW_QUARANTINE.PIPE_ERRORS`; email/Snowflake notification integration. ~30 min.
+2. **Event Grid DLQ.** Add a `dead_letter_blob_name` to the existing Event Grid subscription via Terraform; one block. ~30 min.
+3. **Tighter `FR_CI` role.** New functional role with `CREATE SCHEMA` on `ANALYTICS_CI` + RO on `ANALYTICS_DEV.RAW_*`. Swap `CI_SVC`'s grant from `FR_ENGINEER` to `FR_CI`. ~1 hour.
+4. **Row access policies for multi-tenant isolation.** Define `RAP_TENANT_ISOLATION` policy keyed off `current_role()` → maps to `company` column on CORE / MARTS tables. New `snowflake_row_access_policies` Terraform module. Apply via dbt post-hook (matches the masking-policy precedent). ~2-3 hours. Worth a brief ADR-0019 documenting the role-to-tenant mapping.
+5. Tag `v0.4.0-govern`.
 
-After v0.2.0:
-- **v0.3.0 Serve** — Power BI semantic model on MARTS + paginated reports (SSAS/SSRS replacement story).
-- **v0.4.0 Govern** — row access policies, tighter `FR_CI`, Snowflake Alert on quarantine, Event Grid DLQ.
-- **v0.5.0 Orchestrate + AI** — Airflow DAG, Cortex Document AI demo.
-- **v1.0.0 Portfolio writeup** — legacy vs new stack comparison, cost analysis, lessons learned.
-- **v1.1.0 (post-1.0)** — Azure Postgres Flexible Server + Flyway + Airbyte sync into `RAW_OPS`. Plus user's manual practice onboarding the 8 parked queue tenants. See ADR-0014.
+After v0.4.0:
+- **v0.5.0 Orchestrate + AI** — one Airflow DAG (local Docker); Cortex Document AI demo. Cortex Analyst still region-blocked per ADR-0011.
+- **v1.0.0 Portfolio writeup** — legacy vs new stack comparison, cost analysis, lessons learned, top-level README polish.
+- **Post-v1.0** — see §4 Parked: Power BI GUI build (ADR-0018), v1.1.0 Replicate operational DB (ADR-0014), 8 queue tenants for manual practice.
 
 ## 7. How to interact with me (the user)
 
@@ -363,7 +362,8 @@ After v0.2.0:
 - **Defer Airbyte+Postgres + queue tenants; lock v1.0 scope to 3 tenants** → ADR-0014
 - **Data Vault 2.0 on transactions + Type 2 dim_policy via snapshot** → ADR-0015
 - **Stacked-PR merge convention** → ADR-0016
-- **Power BI on Snowflake — semantic model location, connection mode, auth** → ADR-0017
+- **Power BI on Snowflake — semantic model location, connection mode, auth** → ADR-0017 (publish skipped + GUI build deferred per addenda; see ADR-0018)
+- **Defer Power BI GUI build to post-v1.0; v0.3.0-serve declared done at design+scaffold scope** → ADR-0018
 - **Mock ops hosting (Flexible Server vs VM vs Docker) and Flyway for Postgres DDL** → in-principle agreement reached but final ADRs deferred to v1.1.0 when Postgres work resumes.
 
 ## 9. Reference: phased roadmap
@@ -379,8 +379,8 @@ Scope-locked to 3 tenants for the entire v0.x → v1.0.0 arc. See ADR-0014.
 3. **Model the warehouse — `v0.2.0-model-the-warehouse` (TAGGED 2026-04-22)**
    Star Schema (6 dims + 4 facts + 3 MARTS), Type 2 `dim_policy_history` via dbt snapshot, and full Data Vault 2.0 transactions domain (4 hubs + 3 links + 2 sats with hashdiff guards) all live in CORE. ADR-0015. `dbt build` PASS=72 WARN=0 ERROR=0. Tag pushed at merge commit `f5d9d40`.
 
-4. **Serve — `v0.3.0-serve` (in progress)**
-   Streamlit in Snowflake live with domain dashboards. Power BI scaffold complete: ADR-0017 (with publish-skip addendum) + repo walkthroughs in [power_bi/](power_bi/). Publish to Power BI Service explicitly skipped — `.pbix` + `.rdl` + screenshots in repo are the deliverable. Outstanding: GUI build of `fsp_marts.pbix` (DirectQuery) + `fsp_advisor_commissions.rdl` (Import) + screenshots + tag.
+4. **Serve — declared done at design+scaffold scope (no separate tag) per ADR-0018**
+   Streamlit in Snowflake live with domain dashboards (4 tabs over MARTS, Cortex Analyst scaffold per ADR-0011). Power BI scaffold complete: ADR-0017 (with two addenda — publish skipped + GUI build deferred) + repo walkthroughs in [power_bi/](power_bi/). Power BI GUI build (`.pbix` + `.rdl` + screenshots) deferred to post-v1.0 per ADR-0018; the design + walkthroughs are the v1.0 evidence.
 
 5. **Govern — `v0.4.0-govern`**
    Masking policies on `dim_client` PII live; resource monitors live; quarantine task live. Outstanding: row access policies for multi-tenant isolation; tighter `FR_CI` role; Snowflake Alert on quarantine row-count delta; Event Grid DLQ.
@@ -393,3 +393,6 @@ Scope-locked to 3 tenants for the entire v0.x → v1.0.0 arc. See ADR-0014.
 
 8. **Replicate operational DB — `v1.1.0` (post-1.0)**
    Azure Postgres Flexible Server (Terraform-managed, B1ms + auto-stop) + Flyway V1 schema + Airbyte self-hosted sync into `RAW_OPS` + dbt staging models. Snowflake-side scaffolding already provisioned (`RAW_OPS`, `AIRBYTE_SVC`, `FR_AIRBYTE`). User's manual onboarding of the 8 parked queue tenants happens in this same window (separate practice exercise, not assistant work).
+
+9. **Power BI GUI build — post-v1.0 (no tag yet)** (ADR-0018)
+   `fsp_marts.pbix` (Power BI Desktop, DirectQuery) + `fsp_advisor_commissions.rdl` (Power BI Report Builder, Import) + screenshots. Walkthroughs in [power_bi/walkthrough/](power_bi/walkthrough/) are the canonical instructions. Snowflake side is already in place — `LSILINDA` + `FR_ANALYST` + `BI_WH`.
