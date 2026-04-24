@@ -53,6 +53,9 @@ module "snowpipe_notifications" {
 | `subject_suffix` | `string` | `.csv` | Event Grid filter suffix |
 | `azure_tenant_id` | `string` | — | Azure tenant for the notification integration |
 | `environment` | `string` | — | Environment name for comments |
+| `dlq_storage_container_name` | `string` | `""` | Container for Event Grid dead-letter blobs. Empty disables DLQ. |
+| `dlq_max_delivery_attempts` | `number` | `30` | Attempts before dead-lettering |
+| `dlq_event_time_to_live_seconds` | `number` | `86400` | Retry envelope before dead-lettering (max 86400 = 24h) |
 
 ## Outputs
 
@@ -77,3 +80,30 @@ module "snowpipe_notifications" {
    ```
 4. `terraform apply` again (if the consent was required for state refresh).
 5. Update pipes to `auto_ingest = true`.
+
+## Dead-letter queue (optional)
+
+When `dlq_storage_container_name` is set, Event Grid writes a JSON blob to
+that container for any event it cannot deliver after
+`dlq_max_delivery_attempts`. The subscription uses a **system-assigned
+managed identity** for the dead-letter write; Azure provisions the identity
+implicitly when the subscription declares `dead_letter_identity { type = "SystemAssigned" }`.
+
+Post-apply, grant the subscription's managed identity `Storage Blob Data
+Contributor` on the DLQ container so writes succeed:
+
+```powershell
+# The identity is the Event Grid subscription's principal — find via:
+$subId = az eventgrid system-topic event-subscription show `
+  --name "<subscription name>" `
+  --system-topic-name "<system topic name>" `
+  --resource-group "<rg>" `
+  --query "identity.principalId" -o tsv
+
+az role assignment create `
+  --role "Storage Blob Data Contributor" `
+  --assignee-object-id $subId `
+  --scope "/subscriptions/<subid>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<sa>/blobServices/default/containers/<dlq-container>"
+```
+
+Closes the ADR-0010 known-limitation "no DLQ for delivery failures."

@@ -45,6 +45,14 @@ resource "azurerm_eventgrid_system_topic_event_subscription" "blob_created" {
 
   included_event_types = ["Microsoft.Storage.BlobCreated"]
 
+  # Explicit retry envelope — Azure defaults to 30 attempts / 24h. We pin
+  # both so the DLQ behaviour is reproducible regardless of platform default
+  # drift. Closes the ADR-0010 known-limitation "no DLQ for delivery failures."
+  retry_policy {
+    max_delivery_attempts = var.dlq_max_delivery_attempts
+    event_time_to_live    = floor(var.dlq_event_time_to_live_seconds / 60)
+  }
+
   subject_filter {
     subject_begins_with = var.subject_prefix
     subject_ends_with   = var.subject_suffix
@@ -53,6 +61,27 @@ resource "azurerm_eventgrid_system_topic_event_subscription" "blob_created" {
   storage_queue_endpoint {
     storage_account_id = data.azurerm_storage_account.this.id
     queue_name         = azurerm_storage_queue.snowpipe_events.name
+  }
+
+  # DLQ: when an event fails max_delivery_attempts, Event Grid writes a
+  # JSON blob describing the failure into the configured container.
+  # Skipped entirely when dlq_storage_container_name is empty so the
+  # subscription stays valid before DLQ is wired up.
+  #
+  # Intentionally no `dead_letter_identity` block — Event Grid uses its
+  # built-in service auth to write to the storage account (the same path
+  # it uses for the storage_queue_endpoint). Adding a SystemAssigned
+  # identity here is possible but requires a pre-provisioned RBAC role
+  # assignment (Storage Blob Data Contributor on the DLQ container) and
+  # has been observed to return intermittent "Internal error" responses
+  # from the Event Grid control plane in southafricanorth. The simpler
+  # default path is sufficient for a DLQ on a private storage account.
+  dynamic "storage_blob_dead_letter_destination" {
+    for_each = var.dlq_storage_container_name == "" ? [] : [1]
+    content {
+      storage_account_id          = data.azurerm_storage_account.this.id
+      storage_blob_container_name = var.dlq_storage_container_name
+    }
   }
 }
 

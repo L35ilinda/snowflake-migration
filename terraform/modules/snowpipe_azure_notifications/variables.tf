@@ -44,3 +44,28 @@ variable "environment" {
   type        = string
   description = "Environment name, used in comments."
 }
+
+# ---------------------------------------------------------------------------
+# Dead-letter queue for Event Grid delivery failures.
+# When set, failed deliveries after max_delivery_attempts land as blobs in
+# the configured container. Closes the ADR-0010 known-limitation "no DLQ
+# for delivery failures."
+# ---------------------------------------------------------------------------
+
+variable "dlq_storage_container_name" {
+  type        = string
+  description = "Azure Blob container (in the same storage account) where Event Grid writes failed-delivery blobs. Empty string disables DLQ wiring."
+  default     = ""
+}
+
+variable "dlq_max_delivery_attempts" {
+  type        = number
+  description = "Number of delivery attempts before Event Grid dead-letters the event. Azure default is 30; we set it explicitly for auditability."
+  default     = 30
+}
+
+variable "dlq_event_time_to_live_seconds" {
+  type        = number
+  description = "Seconds Event Grid will retry delivery before dead-lettering. Azure max is 1440 minutes (86400s)."
+  default     = 86400
+}

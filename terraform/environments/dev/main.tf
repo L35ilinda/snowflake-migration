@@ -74,6 +74,9 @@ module "azure_containers" {
     "fsp-main-book"             = { access_type = "private" }
     "fsp-indigo-insurance"      = { access_type = "private" }
     "fsp-horizon-assurance"     = { access_type = "private" }
+    # DLQ target for Event Grid delivery failures. Referenced by
+    # snowpipe_notifications. See ADR-0010 follow-up.
+    "snowpipe-dlq" = { access_type = "private" }
   }
 }
 
@@ -214,6 +217,15 @@ module "snowpipe_notifications" {
   # Only CSVs from our fsp-* containers should trigger Snowpipe.
   subject_prefix = "/blobServices/default/containers/fsp-"
   subject_suffix = ".csv"
+
+  # DLQ: failed Event Grid deliveries write JSON blobs into snowpipe-dlq
+  # after max_delivery_attempts. Referencing the module output (not a string
+  # literal) gives Terraform an explicit dependency on the container create
+  # without triggering a re-read of the storage-account data source — a
+  # module-level depends_on would propagate `known after apply` through the
+  # data source and force-replace the system topic + notification integration.
+  # Closes ADR-0010 known-limitation "no DLQ for delivery failures."
+  dlq_storage_container_name = module.azure_containers.container_names["snowpipe-dlq"]
 
   environment = var.environment
 }
@@ -697,3 +709,33 @@ resource "snowflake_grant_privileges_to_account_role" "fr_airbyte_load_wh_usage"
 # PBI_SVC removed 2026-04-22 — Power BI publish step scoped out per
 # ADR-0017 addendum. No Power BI service identity needed; build phase
 # uses LSILINDA OAuth only.
+
+# ---- Quarantine alert (Snowflake-native email on new pipe errors) ----
+# Closes ADR-0012 known-limitation "no alerting on pipe errors."
+# Email integration is Snowflake-side only; delivery requires the recipient
+# email to match the EMAIL property on a user in this account — see below.
+module "quarantine_alert" {
+  source = "../../modules/snowflake_quarantine_alert"
+
+  database_name                         = module.database_layers.database_name
+  schema_name                           = snowflake_schema.raw_quarantine.name
+  warehouse_name                        = module.warehouses.warehouse_names["LOAD_WH"]
+  quarantine_table_fully_qualified_name = module.quarantine.table_fully_qualified_name
+  email_integration_name                = upper("ni_email_ops_${var.environment}")
+  recipient_emails                      = ["eric.silinda@gmail.com"]
+  environment                           = var.environment
+
+  depends_on = [module.quarantine, snowflake_execute.lsilinda_email]
+}
+
+# LSILINDA pre-dates the IaC discipline (created interactively at account
+# bootstrap). Snowflake's SYSTEM$SEND_EMAIL only delivers to addresses that
+# match the EMAIL property on a user in this account — so we set it here
+# via a one-shot ALTER USER. Captured as snowflake_execute to preserve
+# state on revert. Not importing LSILINDA into full Terraform management
+# keeps this PR scoped to the govern work; a full import can come later.
+resource "snowflake_execute" "lsilinda_email" {
+  execute = "ALTER USER LSILINDA SET EMAIL = 'eric.silinda@gmail.com'"
+  revert  = "ALTER USER LSILINDA UNSET EMAIL"
+  query   = "SHOW USERS LIKE 'LSILINDA'"
+}
