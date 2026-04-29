@@ -196,7 +196,7 @@ resource monitors, Airflow
 - [x] Streamlit-in-Snowflake remains the live serving surface (4 tabs over MARTS, Cortex Analyst scaffold per ADR-0011)
 
 ### Pending (Govern — v0.4.0)
-- [x] Snowflake Alert on `RAW_QUARANTINE.PIPE_ERRORS` row-count delta (closes ADR-0012 loop) — `ALR_QUARANTINE_NEW_ERRORS` via `snowflake_quarantine_alert` module, 5-min cadence on `LOAD_WH`, emails via `NI_EMAIL_OPS_DEV` to `eric.silinda@gmail.com`
+- [x] Snowflake Alert on `RAW_QUARANTINE.PIPE_ERRORS` row-count delta (closes ADR-0012 loop) — `ALR_QUARANTINE_NEW_ERRORS` via `snowflake_quarantine_alert` module, hourly cadence on `LOAD_WH` (initially 5-min; tuned to 60-min to keep query history tidy — quarantine triage is not time-critical), emails via `NI_EMAIL_OPS_DEV` to `eric.silinda@gmail.com`
 - [x] Event Grid DLQ for delivery failures (closes ADR-0010 loop) — `snowpipe-dlq` container + `storage_blob_dead_letter_destination` on existing subscription. `dead_letter_identity` intentionally omitted (see notifications module main.tf comment — Event Grid in `southafricanorth` returns intermittent "Internal error" when managed-identity DLQ is requested; default service-principal auth path is stable)
 - [ ] Row access policies for multi-tenant isolation on CORE/MARTS
 - [ ] Tighter `FR_CI` role scoped down from `FR_ENGINEER`

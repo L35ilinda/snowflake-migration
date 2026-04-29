@@ -723,7 +723,12 @@ module "quarantine_alert" {
   quarantine_table_fully_qualified_name = module.quarantine.table_fully_qualified_name
   email_integration_name                = upper("ni_email_ops_${var.environment}")
   recipient_emails                      = ["eric.silinda@gmail.com"]
-  environment                           = var.environment
+  # Hourly cadence — quarantine triage is not time-critical, and a 60-min
+  # window keeps the alert's polling SQL out of query history every 5 min.
+  # Lookback matches schedule so each window is evaluated exactly once.
+  schedule_minutes = 60
+  lookback_minutes = 60
+  environment      = var.environment
 
   depends_on = [module.quarantine, snowflake_execute.lsilinda_email]
 }
