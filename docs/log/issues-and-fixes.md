@@ -87,6 +87,18 @@ Bootstrap order matters — later steps depend on earlier ones working. Deviatin
 - **Root cause:** Not yet supported by Snowflake for Streamlit objects.
 - **Fix:** Ensure the owner role has the privileges the app needs (see §"Streamlit in Snowflake").
 
+### `snowflake_alert.action` with nested single quotes breaks SQL parser
+- **Symptom:** Apply fails: `001003 (42000): SQL compilation error: syntax error ... unexpected 'minute'` — or any other identifier/keyword that's inside a single-quoted segment within the alert action body.
+- **Root cause:** `snowflake_alert.action` is raw SQL — typically `CALL SYSTEM$SEND_EMAIL('integration', 'recipient', 'subject', 'body')`. Any `'...'` inside the `'body'` literal must be escaped by doubling (`''minute''`), because Snowflake's SQL lexer ends the outer string at the first unescaped `'`.
+- **Fix:** Either double-escape (`''minute''`) or — simpler — keep the body prose-only, no embedded SQL examples or punctuation. The email's job is "go look"; operators query the quarantine table for detail. Move the triage SQL into the module README.
+- **Replication tip:** When building alert/action payloads in Terraform, mentally add a linter rule: "no single quotes inside the email body." If you need SQL examples, put them in the module README and reference by name in the email.
+
+### `snowflake_email_notification_integration` delivery silently drops unverified recipients
+- **Symptom:** Alert fires (visible in `SHOW ALERTS`), but the email never arrives.
+- **Root cause:** `SYSTEM$SEND_EMAIL` only delivers to addresses that match the `EMAIL` property set on a Snowflake user in the same account. Listing an address in `allowed_recipients` on the integration is necessary but not sufficient.
+- **Fix:** `ALTER USER <name> SET EMAIL = '<address>'` for each recipient user. In this project `LSILINDA` pre-dates IaC, so we set it via a `snowflake_execute` one-shot (see `environments/dev/main.tf`) rather than importing the user into Terraform.
+- **Replication tip:** When adding a new recipient, set the EMAIL property on the corresponding Snowflake user **first**, then extend `recipient_emails`.
+
 ---
 
 ## Preview feature gating
@@ -100,6 +112,8 @@ Resources we needed to enable, in order:
 - `snowflake_pipe_resource`
 - `snowflake_table_resource`
 - `snowflake_notification_integration_resource`
+- `snowflake_email_notification_integration_resource` (added 2026-04-24 for quarantine alert)
+- `snowflake_alert_resource` (added 2026-04-24 for quarantine alert)
 
 **Not** a preview resource (do **not** add — will reject): `snowflake_streamlit_resource` is GA.
 
@@ -118,6 +132,12 @@ Resources we needed to enable, in order:
 ### Snowpipe created before queue RBAC
 - **Symptom:** First apply after adding the notification integration fails with `Pipe Notifications bind failure: Internal error, could not locate queue for integration`. Azure admin consent and queue RBAC must be in place before Snowflake can validate the queue.
 - **Fix:** Two-step bootstrap (documented in §"Snowpipe auto-ingest bootstrap").
+
+### `depends_on` at module-call level force-replaces downstream resources
+- **Symptom:** Adding `depends_on = [module.X]` to a module call produces a plan with unexpected `-/+ must be replaced` entries on resources that reference a **data source** inside the module — even though the data source lookup is stable and the referenced resource has no config changes. Typical victims: `azurerm_eventgrid_system_topic`, `snowflake_notification_integration` — any resource whose config references an attribute of a data source inside the same module.
+- **Root cause:** Module-level `depends_on` marks the *entire* module graph — including any internal `data` blocks — as "depends on pending changes in X." Terraform then refuses to know the data source's values at plan time, marks them `(known after apply)`, and resources whose arguments transitively reference those attributes (via `# forces replacement` semantics) get flagged for replacement.
+- **Fix:** Replace module-level `depends_on` with an explicit input reference where possible. E.g. instead of `depends_on = [module.azure_containers]`, pass `dlq_storage_container_name = module.azure_containers.container_names["snowpipe-dlq"]`. That creates the same graph edge but scoped to a single value, not the whole module, so the data source can still read at plan time.
+- **Replication tip:** When you want to enforce ordering between modules, prefer output→input wiring over `depends_on`. Reach for module-level `depends_on` only when there's genuinely no input to thread through (e.g. side-effectful provisioners).
 
 ---
 
@@ -152,6 +172,12 @@ Resources we needed to enable, in order:
 ### Azure Event Grid subscription names reject underscores
 - **Symptom:** Apply fails: `EventGrid subscription name must be 3-64 characters long, contain only letters, numbers and hyphens.`
 - **Fix:** When deriving names from Snowflake identifiers (which use underscores), transform with `replace(lower(var.name), "_", "-")`.
+
+### Event Grid `dead_letter_identity` with `SystemAssigned` returns `Internal error` in `southafricanorth`
+- **Symptom:** Applying `azurerm_eventgrid_system_topic_event_subscription` with `dead_letter_identity { type = "SystemAssigned" }` + `storage_blob_dead_letter_destination` repeatedly returns `Status: "Failed", Code: "Internal error", Message: "The operation failed due to an internal server error. The initial state of the impacted resources (if any) are restored."` — not a transient, reproducible across retries. `storage_queue_endpoint` on the same subscription updates fine.
+- **Root cause:** Not fully diagnosed, but the managed-identity validation path for DLQ writes appears to be flaky on system-topic subscriptions in `southafricanorth`. The `storage_queue_endpoint` uses Event Grid's built-in service-principal auth to the storage account (no identity block) and is stable; the DLQ destination can use the same path.
+- **Fix:** Omit the `dead_letter_identity` block. Configure `storage_blob_dead_letter_destination` with just `storage_account_id` + `storage_blob_container_name`. Event Grid then uses its default service auth for DLQ writes (same path as the queue endpoint). No RBAC pre-assignment needed. Documented in the `snowpipe_azure_notifications` module comment.
+- **Replication tip:** If you specifically need identity-based DLQ writes (e.g. storage account has shared-key access disabled), expect to either retry repeatedly or open a region change. For a private storage account on a separate storage account, default service auth is sufficient.
 
 ---
 
