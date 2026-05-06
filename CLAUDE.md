@@ -199,7 +199,7 @@ resource monitors, Airflow
 - [x] Snowflake Alert on `RAW_QUARANTINE.PIPE_ERRORS` row-count delta (closes ADR-0012 loop) — `ALR_QUARANTINE_NEW_ERRORS` via `snowflake_quarantine_alert` module, hourly cadence on `LOAD_WH` (initially 5-min; tuned to 60-min to keep query history tidy — quarantine triage is not time-critical), emails via `NI_EMAIL_OPS_DEV` to `eric.silinda@gmail.com`
 - [x] Event Grid DLQ for delivery failures (closes ADR-0010 loop) — `snowpipe-dlq` container + `storage_blob_dead_letter_destination` on existing subscription. `dead_letter_identity` intentionally omitted (see notifications module main.tf comment — Event Grid in `southafricanorth` returns intermittent "Internal error" when managed-identity DLQ is requested; default service-principal auth path is stable)
 - [ ] Row access policies for multi-tenant isolation on CORE/MARTS
-- [ ] Tighter `FR_CI` role scoped down from `FR_ENGINEER`
+- [x] Tighter `FR_CI` role scoped down from `FR_ENGINEER` (closes ADR-0009 follow-up) — new functional role with all `*_ro` access roles on `ANALYTICS_DEV` + USAGE/CREATE SCHEMA on `ANALYTICS_CI` + USAGE on `TRANSFORM_WH` only. `CI_SVC` swapped from `FR_ENGINEER` to `FR_CI`. ADR-0019. Live test = PR-B's own CI run.
 - [ ] Tag `v0.4.0-govern`
 
 ### Pending (Orchestrate + AI — v0.5.0)
@@ -231,7 +231,7 @@ Per ADRs 0014 / 0018 — deferred to keep the v1.0 path focused on higher-impact
 - **SEMANTIC schema:** internal stage `MODELS` (Cortex semantic model YAML + Streamlit source); Streamlit app `FSP_ANALYST`
 - **Warehouses:** `COMPUTE_WH` (default, XS, 300s), `LOAD_WH` (XS, 60s), `TRANSFORM_WH` (XS, 60s), `BI_WH` (XS, 60s)
 - **Resource monitors:** `RM_DEV_ACCOUNT` (10cr backstop), `RM_LOAD_WH` (5cr), `RM_TRANSFORM_WH` (3cr), `RM_BI_WH` (2cr)
-- **Roles:** `FR_ENGINEER` (all RW incl. `RAW_QUARANTINE`, `RAW_OPS`), `FR_ANALYST` (staging/core/marts RO + `RAW_QUARANTINE` RO for data-quality visibility), `FR_AIRBYTE` (`RAW_OPS` RW only — Airbyte destination), 16 access roles (`AR_ANALYTICS_DEV_<SCHEMA>_RW/RO`), `CI_SVC` service user with `FR_ENGINEER`, `AIRBYTE_SVC` service user with `FR_AIRBYTE`. `ACCOUNTADMIN` holds `AR_ANALYTICS_DEV_MARTS_RO` so the Streamlit app (owner = ACCOUNTADMIN) can query MARTS. `SNOWFLAKE.CORTEX_USER` granted to FR_ENGINEER, FR_ANALYST, ACCOUNTADMIN.
+- **Roles:** `FR_ENGINEER` (all RW incl. `RAW_QUARANTINE`, `RAW_OPS`), `FR_ANALYST` (staging/core/marts RO + `RAW_QUARANTINE` RO for data-quality visibility), `FR_AIRBYTE` (`RAW_OPS` RW only — Airbyte destination), `FR_CI` (all RO on `ANALYTICS_DEV` + RW on `ANALYTICS_CI` + USAGE on `TRANSFORM_WH` only — see ADR-0019), 16 access roles (`AR_ANALYTICS_DEV_<SCHEMA>_RW/RO`), `CI_SVC` service user with `FR_CI` (was `FR_ENGINEER` pre-PR-B), `AIRBYTE_SVC` service user with `FR_AIRBYTE`. `ACCOUNTADMIN` holds `AR_ANALYTICS_DEV_MARTS_RO` so the Streamlit app (owner = ACCOUNTADMIN) can query MARTS. `SNOWFLAKE.CORTEX_USER` granted to FR_ENGINEER, FR_ANALYST, ACCOUNTADMIN.
 - **Storage integration:** `SI_AZURE_FSPSFTPSOURCE_DEV` (covers `fsp-main-book`, `fsp-indigo-insurance`, `fsp-horizon-assurance`)
 - **Notification integration:** `NI_AZURE_FSPSFTPSOURCE_DEV` wired to Event Grid → Storage Queue `snowpipe-events` for auto-ingest (ADR-0010)
 - **Stages:** `STG_MAIN_BOOK`, `STG_INDIGO_INSURANCE`, `STG_HORIZON_ASSURANCE` (external, per-tenant); `SEMANTIC.MODELS` (internal)
@@ -240,7 +240,7 @@ Per ADRs 0014 / 0018 — deferred to keep the v1.0 path focused on higher-impact
 - **File formats:** `FF_CSV_MAIN_BOOK`, `FF_CSV_INDIGO_INSURANCE`, `FF_CSV_HORIZON_ASSURANCE`
 - **Masking policies:** `MP_MASK_STRING_PII`, `MP_MASK_DATE_PII` in `CORE`; applied to `dim_client` via dbt post-hook when `target.database == 'ANALYTICS_DEV'`
 - **Account parameters:** `ENABLE_CORTEX_ANALYST = TRUE` (set; blocked by region per ADR-0011)
-- **Terraform-managed state:** storage integration, 2 databases, 9 schemas, 3 external stages + 1 internal stage, 3 file formats, 19 tables (18 landing + 1 quarantine), 18 pipes, 1 task, 1 alert, 19 roles, 3 warehouses, 4 resource monitors, 5 Azure containers (incl. `snowpipe-dlq`), 1 Azure storage queue, 1 Event Grid system topic + subscription (with DLQ), 1 Snowflake notification integration, 1 Snowflake email notification integration (`NI_EMAIL_OPS_DEV`), 2 masking policies, 1 Streamlit app, `CI_SVC` + `AIRBYTE_SVC` users; `LSILINDA` email set via `snowflake_execute` one-shot
+- **Terraform-managed state:** storage integration, 2 databases, 9 schemas, 3 external stages + 1 internal stage, 3 file formats, 19 tables (18 landing + 1 quarantine), 18 pipes, 1 task, 1 alert, 20 roles (incl. new `FR_CI`), 3 warehouses, 4 resource monitors, 5 Azure containers (incl. `snowpipe-dlq`), 1 Azure storage queue, 1 Event Grid system topic + subscription (with DLQ), 1 Snowflake notification integration, 1 Snowflake email notification integration (`NI_EMAIL_OPS_DEV`), 2 masking policies, 1 Streamlit app, `CI_SVC` + `AIRBYTE_SVC` users; `LSILINDA` email set via `snowflake_execute` one-shot
 
 ### Source data shape
 - **Total files:** ~80 CSVs across all containers + onboarding queue
@@ -311,7 +311,7 @@ Existing CORE / MARTS (3 tenants, masking on dim_client, monitors + caps live)
 Concrete steps for the next session (continuing from PR-A complete):
 1. ~~**Snowflake Alert on quarantine row-count delta.**~~ ✓ Shipped 2026-04-24 (PR-A). `ALR_QUARANTINE_NEW_ERRORS` via new `snowflake_quarantine_alert` module.
 2. ~~**Event Grid DLQ.**~~ ✓ Shipped 2026-04-24 (PR-A). `snowpipe-dlq` container + `storage_blob_dead_letter_destination`. No managed identity (see notifications module comment).
-3. **Tighter `FR_CI` role.** New functional role with `CREATE SCHEMA` on `ANALYTICS_CI` + RO on `ANALYTICS_DEV.RAW_*`. Swap `CI_SVC`'s grant from `FR_ENGINEER` to `FR_CI`. ~1 hour. ADR-0019.
+3. ~~**Tighter `FR_CI` role.**~~ ✓ Shipped 2026-04-24 (PR-B). Pre-merge: PR opened against PR-A's branch (stacked per ADR-0016); will retarget to master after PR #19 merges.
 4. **Row access policies for multi-tenant isolation.** Define `RAP_TENANT_ISOLATION` policy keyed off `current_role()` → maps to `company` column on CORE / MARTS tables. New `snowflake_row_access_policies` Terraform module. Apply via dbt post-hook (matches the masking-policy precedent). ~2-3 hours. ADR-0020.
 5. Tag `v0.4.0-govern`.
 

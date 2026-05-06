@@ -118,6 +118,16 @@ module "rbac" {
       comment            = "Self-hosted Airbyte destination role. Writes replicated operational tables into RAW_OPS. See ADR-0013."
       access_role_grants = ["raw_ops_rw"]
     }
+    FR_CI = {
+      comment = "Read-only on ANALYTICS_DEV; RW grants on ANALYTICS_CI added directly. See ADR-0019."
+      # All RO access roles for ANALYTICS_DEV — gives CI source-read access
+      # to RAW_*, STAGING, CORE, MARTS, RAW_QUARANTINE, RAW_OPS without the
+      # write/APPLY/BI privileges that come with FR_ENGINEER.
+      access_role_grants = concat(
+        [for cid, name in module.database_layers.raw_schema_names : "${lower(name)}_ro"],
+        ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro", "raw_ops_ro"]
+      )
+    }
   }
 
   user_grants = {
@@ -146,10 +156,13 @@ module "warehouses" {
       grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
     }
     TRANSFORM_WH = {
-      size           = "XSMALL"
-      auto_suspend   = 60
-      comment        = "dbt transformations."
-      grant_usage_to = [module.rbac.functional_role_names["FR_ENGINEER"]]
+      size         = "XSMALL"
+      auto_suspend = 60
+      comment      = "dbt transformations."
+      grant_usage_to = [
+        module.rbac.functional_role_names["FR_ENGINEER"],
+        module.rbac.functional_role_names["FR_CI"],
+      ]
     }
     BI_WH = {
       size         = "XSMALL"
@@ -545,10 +558,12 @@ resource "snowflake_database" "analytics_ci" {
   comment = "CI build target for dbt runs from GitHub Actions. See ADR-0009."
 }
 
-# Grant USAGE + CREATE SCHEMA on ANALYTICS_CI to FR_ENGINEER so dbt (running
-# as CI_SVC → FR_ENGINEER) can create and populate schemas.
-resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_usage" {
-  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+# Grant USAGE + CREATE SCHEMA on ANALYTICS_CI to FR_CI so dbt (running as
+# CI_SVC → FR_CI) can create and populate schemas. FR_ENGINEER no longer
+# needs these — LSILINDA doesn't run dbt against ANALYTICS_CI directly,
+# that's GitHub Actions' job. See ADR-0019.
+resource "snowflake_grant_privileges_to_account_role" "fr_ci_database_usage" {
+  account_role_name = module.rbac.functional_role_names["FR_CI"]
   privileges        = ["USAGE"]
 
   on_account_object {
@@ -557,8 +572,8 @@ resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_u
   }
 }
 
-resource "snowflake_grant_privileges_to_account_role" "fr_engineer_ci_database_create_schema" {
-  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+resource "snowflake_grant_privileges_to_account_role" "fr_ci_database_create_schema" {
+  account_role_name = module.rbac.functional_role_names["FR_CI"]
   privileges        = ["CREATE SCHEMA"]
 
   on_account_object {
@@ -574,17 +589,18 @@ resource "snowflake_user" "ci_svc" {
   name         = "CI_SVC"
   login_name   = "CI_SVC"
   display_name = "CI service account (GitHub Actions)"
-  comment      = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009."
+  comment      = "Runs dbt build on PRs. Target: ANALYTICS_CI. See ADR-0009 + ADR-0019."
   disabled     = "false"
 
-  default_role      = module.rbac.functional_role_names["FR_ENGINEER"]
+  default_role      = module.rbac.functional_role_names["FR_CI"]
   default_warehouse = module.warehouses.warehouse_names["TRANSFORM_WH"]
 
   rsa_public_key = file(var.ci_svc_public_key_path)
 }
 
-resource "snowflake_grant_account_role" "ci_svc_fr_engineer" {
-  role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+# Tightened from FR_ENGINEER to FR_CI in PR-B. See ADR-0019.
+resource "snowflake_grant_account_role" "ci_svc_fr_ci" {
+  role_name = module.rbac.functional_role_names["FR_CI"]
   user_name = snowflake_user.ci_svc.name
 }
 
