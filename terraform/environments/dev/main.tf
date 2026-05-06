@@ -128,14 +128,38 @@ module "rbac" {
         ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro", "raw_ops_ro"]
       )
     }
+    # Per-tenant analyst roles. Same access roles as FR_ANALYST — the RAP
+    # filters at the row level, so granting the same SELECT privileges is
+    # correct. Tenant scoping is enforced by RAP_TENANT_ISOLATION via
+    # current_role() pattern matching. See ADR-0020.
+    FR_ANALYST_MAIN_BOOK = {
+      comment            = "Tenant-scoped analyst — sees only MAIN_BOOK rows via RAP_TENANT_ISOLATION. See ADR-0020."
+      access_role_grants = ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro"]
+    }
+    FR_ANALYST_INDIGO_INSURANCE = {
+      comment            = "Tenant-scoped analyst — sees only INDIGO_INSURANCE rows via RAP_TENANT_ISOLATION. See ADR-0020."
+      access_role_grants = ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro"]
+    }
+    FR_ANALYST_HORIZON_ASSURANCE = {
+      comment            = "Tenant-scoped analyst — sees only HORIZON_ASSURANCE rows via RAP_TENANT_ISOLATION. See ADR-0020."
+      access_role_grants = ["staging_ro", "core_ro", "marts_ro", "raw_quarantine_ro"]
+    }
   }
 
   user_grants = {
-    # LSILINDA holds both functional roles so we can test analyst-facing
-    # artefacts (e.g. dim_client masking policies) without a second user.
-    # Service users (CI_SVC, AIRBYTE_SVC) are granted outside this module
-    # because they are created alongside dev/main.tf, not inside snowflake_rbac.
-    LSILINDA = ["FR_ENGINEER", "FR_ANALYST"]
+    # LSILINDA holds every functional role so we can verify analyst-facing
+    # artefacts (masking policies, RAP_TENANT_ISOLATION) without provisioning
+    # extra human users. Each `USE ROLE` in the verification script switches
+    # the live role for the next query. Service users (CI_SVC, AIRBYTE_SVC)
+    # are granted outside this module because they are created alongside
+    # dev/main.tf, not inside snowflake_rbac.
+    LSILINDA = [
+      "FR_ENGINEER",
+      "FR_ANALYST",
+      "FR_ANALYST_MAIN_BOOK",
+      "FR_ANALYST_INDIGO_INSURANCE",
+      "FR_ANALYST_HORIZON_ASSURANCE",
+    ]
   }
 
   depends_on = [snowflake_schema.raw_quarantine, snowflake_schema.raw_ops]
@@ -171,6 +195,11 @@ module "warehouses" {
       grant_usage_to = [
         module.rbac.functional_role_names["FR_ENGINEER"],
         module.rbac.functional_role_names["FR_ANALYST"],
+        # Tenant-scoped analyst roles need the same warehouse to verify RAP.
+        # See ADR-0020.
+        module.rbac.functional_role_names["FR_ANALYST_MAIN_BOOK"],
+        module.rbac.functional_role_names["FR_ANALYST_INDIGO_INSURANCE"],
+        module.rbac.functional_role_names["FR_ANALYST_HORIZON_ASSURANCE"],
       ]
     }
   }
@@ -545,6 +574,52 @@ resource "snowflake_grant_privileges_to_account_role" "apply_masking_policies" {
 
   on_schema_object {
     object_type = "MASKING POLICY"
+    object_name = each.value
+  }
+}
+
+# ---- Row access policies (multi-tenant isolation on CORE / MARTS) ----
+# Defines RAP_TENANT_ISOLATION; attachment happens in dbt via post_hook
+# gated on target.database == 'ANALYTICS_DEV'. See ADR-0020.
+module "row_access_policies" {
+  source = "../../modules/snowflake_row_access_policies"
+
+  database_name = module.database_layers.database_name
+  schema_name   = module.database_layers.core_schema_name
+  environment   = var.environment
+
+  policies = {
+    RAP_TENANT_ISOLATION = {
+      signature = "company VARCHAR"
+      body      = <<-SQL
+        case
+          when current_role() in ('ACCOUNTADMIN', 'FR_ENGINEER', 'FR_CI', 'FR_ANALYST') then true
+          when current_role() = 'FR_ANALYST_MAIN_BOOK'         and company = 'MAIN_BOOK'         then true
+          when current_role() = 'FR_ANALYST_INDIGO_INSURANCE'  and company = 'INDIGO_INSURANCE'  then true
+          when current_role() = 'FR_ANALYST_HORIZON_ASSURANCE' and company = 'HORIZON_ASSURANCE' then true
+          else false
+        end
+      SQL
+      comment   = "Multi-tenant row isolation by company. See ADR-0020."
+    }
+  }
+
+  depends_on = [module.database_layers, module.rbac]
+}
+
+# Grant APPLY on each row access policy to FR_ENGINEER so dbt's post-hook
+# (running as FR_ENGINEER) can attach via ALTER TABLE ... ADD ROW ACCESS
+# POLICY. Mirrors the masking-policy APPLY grant above. FR_CI deliberately
+# does NOT get APPLY because the post-hook is target.database gated and
+# no-ops in CI.
+resource "snowflake_grant_privileges_to_account_role" "apply_row_access_policies" {
+  for_each = module.row_access_policies.policy_fully_qualified_names
+
+  account_role_name = module.rbac.functional_role_names["FR_ENGINEER"]
+  privileges        = ["APPLY"]
+
+  on_schema_object {
+    object_type = "ROW ACCESS POLICY"
     object_name = each.value
   }
 }

@@ -1,3 +1,7 @@
+{# Apply RAP_TENANT_ISOLATION on dev only; CI target no-ops. See ADR-0020. #}
+{% set apply_rap = target.database == 'ANALYTICS_DEV' %}
+{{ config(post_hook=(attach_rap_tenant_isolation() if apply_rap else [])) }}
+
 {#
     Conformed transactions fact.
 
