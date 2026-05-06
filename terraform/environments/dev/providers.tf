@@ -41,5 +41,6 @@ provider "snowflake" {
     "snowflake_notification_integration_resource",
     "snowflake_email_notification_integration_resource",
     "snowflake_alert_resource",
+    # snowflake_row_access_policy is GA in v1.x — no preview opt-in needed.
   ]
 }
